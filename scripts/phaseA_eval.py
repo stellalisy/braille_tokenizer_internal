@@ -45,6 +45,7 @@ def main():
     ap.add_argument("--max-tokens", type=int, default=1024)
     ap.add_argument("--max-model-len", type=int, default=8192)
     ap.add_argument("--thinking", action="store_true", help="Qwen3 thinking mode (off by default)")
+    ap.add_argument("--no-chat", action="store_true", help="raw prompt, no chat template (diagnostic)")
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args()
 
@@ -60,6 +61,8 @@ def main():
     sp = SamplingParams(temperature=0.0, max_tokens=a.max_tokens, seed=a.seed)
 
     def chat(prompt):
+        if a.no_chat:
+            return prompt + "\n\n"
         kw = {"enable_thinking": a.thinking} if "qwen3" in a.model.lower() else {}
         return tok.apply_chat_template([{"role": "user", "content": prompt}], tokenize=False,
                                        add_generation_prompt=True, **kw)
@@ -106,7 +109,7 @@ def main():
     json.dump({
         "command": "python " + " ".join(sys.argv),
         "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-        "model": a.model, "revision": a.revision, "thinking": a.thinking, "seed": a.seed,
+        "model": a.model, "revision": a.revision, "thinking": a.thinking, "chat_template": not a.no_chat, "seed": a.seed,
         "decoding": {"temperature": 0.0, "max_tokens": a.max_tokens},
         "vllm": vllm.__version__, "liblouis": louis.version(),
         "braillebench_commit": subprocess.check_output(["git", "-C", a.bb, "rev-parse", "HEAD"], text=True).strip(),
