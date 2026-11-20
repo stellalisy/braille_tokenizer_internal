@@ -4,6 +4,7 @@ Writes one JSONL per condition in the BrailleBench record format, so its own pro
 answer extraction and scoring apply unchanged:
 
   print                       English question (BrailleBench EN-EN)
+  print_clean                 the preprocessed English text the braille was rendered from
   g{1,2}_{ascii,unicode}_p{P} braille question (and choices), P% of cells with one dot flipped
   pipe_g{1,2}_p{P}            liblouis back-translation of the same noisy braille, asked as EN-EN
 
@@ -67,6 +68,13 @@ def main():
             for r in base:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
         counts[f"{ds}/print"] = len(base)
+        # BrailleBench renders braille from `clean_question`, whose preprocessing strips paired `$`
+        # as LaTeX delimiters. print_clean asks the print prompt on that exact text.
+        with open(f"{d}/print_clean.jsonl", "w", encoding="utf8") as f:
+            for r in base:
+                f.write(json.dumps(dict(r, question=r.get("clean_question") or r["question"]),
+                                   ensure_ascii=False) + "\n")
+        counts[f"{ds}/print_clean"] = len(base)
         for g in (1, 2):
             uni = load(f"{a.bb}/data/braille/{ds}/grade{g}/unicode.jsonl")
             asc = load(f"{a.bb}/data/braille/{ds}/grade{g}/ascii.jsonl")
@@ -95,7 +103,7 @@ def main():
                     rp["question"] = " ".join(translate.back(normalize(q), g).split())
                     if ch:
                         rp["choices"] = [" ".join(translate.back(normalize(c), g).split()) for c in ch]
-                    rp["source_question"] = s["question"]
+                    rp["source_question"] = s.get("clean_question") or s["question"]
                     rows["unicode"].append(ru)
                     rows["ascii"].append(ra)
                     rows["pipe"].append(rp)
