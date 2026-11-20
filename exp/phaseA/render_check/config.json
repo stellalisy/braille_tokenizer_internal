@@ -1,0 +1,6 @@
+{
+ "command": "python scripts/check_braillebench_render.py --bb /gpfs/scrubbed/stelli/braille/ext/braillebench --out exp/phaseA/render_check",
+ "git_commit": "cc86e765defe191d4007a1aae478db7ca635a900",
+ "liblouis": "3.32.0",
+ "braillebench_commit": "ca8997a7762e625b42887974920e89a9785eaa31"
+}

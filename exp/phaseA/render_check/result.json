@@ -1,0 +1,30 @@
+{
+ "liblouis": "3.32.0",
+ "braillebench_commit": "ca8997a7762e625b42887974920e89a9785eaa31",
+ "result": {
+  "gsm8k/grade1": {
+   "n": 1319,
+   "render_match": 1.0,
+   "back_exact": 0.9591,
+   "mismatches": []
+  },
+  "gsm8k/grade2": {
+   "n": 1319,
+   "render_match": 1.0,
+   "back_exact": 0.9492,
+   "mismatches": []
+  },
+  "commonsenseqa/grade1": {
+   "n": 1221,
+   "render_match": 1.0,
+   "back_exact": 1.0,
+   "mismatches": []
+  },
+  "commonsenseqa/grade2": {
+   "n": 1221,
+   "render_match": 1.0,
+   "back_exact": 0.9975,
+   "mismatches": []
+  }
+ }
+}

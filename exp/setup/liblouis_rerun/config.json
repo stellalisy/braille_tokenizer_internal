@@ -1,0 +1,8 @@
+{
+ "command": "python scripts/eval_liblouis.py --data data --out exp/setup/liblouis_rerun",
+ "git_commit": "cc86e765defe191d4007a1aae478db7ca635a900",
+ "liblouis": "3.32.0",
+ "nltk": "3.10.4",
+ "data": "scripts/build_data.py --out data --test-sentences test_sentences.json (seed 0)",
+ "slurm_job": "504459"
+}
