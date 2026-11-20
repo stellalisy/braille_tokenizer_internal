@@ -1,0 +1,50 @@
+{
+ "commonsenseqa/chat_greedy/s0": {
+  "jul": 72.15,
+  "released": 72.24
+ },
+ "commonsenseqa/bedrock_greedy/s0": {
+  "jul": 19.08,
+  "released": 19.08
+ },
+ "commonsenseqa/bedrock_t0.01/s0": {
+  "jul": 18.1,
+  "released": 18.1
+ },
+ "commonsenseqa/bedrock_t0.01/s1": {
+  "jul": 18.26,
+  "released": 18.26
+ },
+ "commonsenseqa/bedrock_t0.01/s2": {
+  "jul": 18.67,
+  "released": 18.67
+ },
+ "commonsenseqa/bedrock_doublebos_greedy/s0": {
+  "jul": 35.46,
+  "released": 35.46
+ },
+ "gsm8k/chat_greedy/s0": {
+  "jul": 83.7,
+  "released": 86.05
+ },
+ "gsm8k/bedrock_greedy/s0": {
+  "jul": 85.29,
+  "released": 86.2
+ },
+ "gsm8k/bedrock_t0.01/s0": {
+  "jul": 84.53,
+  "released": 85.82
+ },
+ "gsm8k/bedrock_t0.01/s1": {
+  "jul": 84.69,
+  "released": 85.52
+ },
+ "gsm8k/bedrock_t0.01/s2": {
+  "jul": 85.44,
+  "released": 86.43
+ },
+ "gsm8k/bedrock_doublebos_greedy/s0": {
+  "jul": 82.49,
+  "released": 83.17
+ }
+}

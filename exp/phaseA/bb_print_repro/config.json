@@ -1,0 +1,7 @@
+{
+ "command": "python scripts/bb_print_repro.py --out exp/phaseA/bb_print_repro",
+ "model": "meta-llama/Llama-3.1-8B-Instruct",
+ "revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+ "braillebench_jul_commit": "20c449c",
+ "git_commit": "0b99aa87f60a54df92af4e008e507b49d093f283"
+}

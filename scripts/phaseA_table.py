@@ -35,8 +35,19 @@ def load(run):
     return merged
 
 
+def with_choice(run, r):
+    """Use choice accuracy as the CommonsenseQA primary metric (scripts/rescore_csqa.py output)."""
+    for p in [f"{run}/csqa_choice.json"]:
+        if os.path.exists(p):
+            for cond, v in json.load(open(p)).items():
+                k = f"commonsenseqa/{cond}"
+                if k in r:
+                    r[k] = dict(r[k], released_em=v["released_em"], primary=v["choice_acc"])
+    return r
+
+
 def main(runs):
-    res = {os.path.basename(r.rstrip("/")): load(r) for r in runs}
+    res = {os.path.basename(r.rstrip("/")): with_choice(r, load(r)) for r in runs}
     print("### Clean input\n")
     print("| Run | Dataset | Print | Print (preprocessed) | ASCII G1 | ASCII G2 | Unicode G1 | Unicode G2 | Pipeline G1 | Pipeline G2 | Gap closed G1 | Gap closed G2 |")
     print("|" + "---|" * 12)

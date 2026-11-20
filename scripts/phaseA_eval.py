@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 
-PRIMARY = {"gsm8k": "math_verify", "commonsenseqa": "em"}
+PRIMARY = {"gsm8k": "math_verify", "commonsenseqa": "choice"}   # see brltok/scoring.py and NOTES.md
 
 
 def condition_config(cond):
@@ -51,6 +51,8 @@ def main():
 
     sys.path.insert(0, os.path.join(a.bb, "src"))
     import evaluate_braille as bb          # BrailleBench prompts, extraction, metrics
+    from brltok.scoring import choice_correct
+    base_choices = {}
     from vllm import LLM, SamplingParams
     import vllm
 
@@ -96,6 +98,12 @@ def main():
                     gold = bb.get_gold_answers(r, ds)
                     pred = bb.extract_answer(resp)
                     m = bb.compute_metrics(pred, gold, ds)
+                    if ds == "commonsenseqa":
+                        # choices from the clean print record, so a copied noisy choice does not match
+                        if not base_choices:
+                            base_choices.update({i: json.loads(l)["choices"] for i, l in
+                                                 enumerate(open(f"{a.inputs}/{ds}/print.jsonl", encoding="utf8"))})
+                        m["choice"] = choice_correct(resp, base_choices[len(acc.get("em", []))], gold)
                     for k, v in m.items():
                         acc.setdefault(k, []).append(v)
                     f.write(json.dumps({"id": r.get("id"), "prompt": p, "gold": gold, "predicted": pred,
