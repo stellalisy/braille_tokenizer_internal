@@ -1,0 +1,132 @@
+{
+ "g1_ascii_p0": {
+  "n": 1221,
+  "released_em": 8.85,
+  "choice_acc": 61.75
+ },
+ "g1_ascii_p10": {
+  "n": 1221,
+  "released_em": 6.72,
+  "choice_acc": 30.06
+ },
+ "g1_ascii_p2": {
+  "n": 1221,
+  "released_em": 8.19,
+  "choice_acc": 52.25
+ },
+ "g1_ascii_p5": {
+  "n": 1221,
+  "released_em": 9.5,
+  "choice_acc": 44.23
+ },
+ "g1_unicode_p0": {
+  "n": 1221,
+  "released_em": 0.0,
+  "choice_acc": 0.0
+ },
+ "g1_unicode_p10": {
+  "n": 1221,
+  "released_em": 0.0,
+  "choice_acc": 0.0
+ },
+ "g1_unicode_p2": {
+  "n": 1221,
+  "released_em": 0.0,
+  "choice_acc": 0.0
+ },
+ "g1_unicode_p5": {
+  "n": 1221,
+  "released_em": 0.0,
+  "choice_acc": 0.0
+ },
+ "g2_ascii_p0": {
+  "n": 1221,
+  "released_em": 3.36,
+  "choice_acc": 21.54
+ },
+ "g2_ascii_p10": {
+  "n": 1221,
+  "released_em": 2.38,
+  "choice_acc": 11.3
+ },
+ "g2_ascii_p2": {
+  "n": 1221,
+  "released_em": 2.7,
+  "choice_acc": 18.18
+ },
+ "g2_ascii_p5": {
+  "n": 1221,
+  "released_em": 2.05,
+  "choice_acc": 15.32
+ },
+ "g2_unicode_p0": {
+  "n": 1221,
+  "released_em": 0.0,
+  "choice_acc": 0.0
+ },
+ "g2_unicode_p10": {
+  "n": 1221,
+  "released_em": 0.0,
+  "choice_acc": 0.0
+ },
+ "g2_unicode_p2": {
+  "n": 1221,
+  "released_em": 0.0,
+  "choice_acc": 0.0
+ },
+ "g2_unicode_p5": {
+  "n": 1221,
+  "released_em": 0.0,
+  "choice_acc": 0.0
+ },
+ "pipe_g1_p0": {
+  "n": 1221,
+  "released_em": 47.42,
+  "choice_acc": 68.06
+ },
+ "pipe_g1_p10": {
+  "n": 1221,
+  "released_em": 22.11,
+  "choice_acc": 36.04
+ },
+ "pipe_g1_p2": {
+  "n": 1221,
+  "released_em": 44.14,
+  "choice_acc": 59.54
+ },
+ "pipe_g1_p5": {
+  "n": 1221,
+  "released_em": 36.2,
+  "choice_acc": 47.75
+ },
+ "pipe_g2_p0": {
+  "n": 1221,
+  "released_em": 47.34,
+  "choice_acc": 68.06
+ },
+ "pipe_g2_p10": {
+  "n": 1221,
+  "released_em": 22.93,
+  "choice_acc": 36.77
+ },
+ "pipe_g2_p2": {
+  "n": 1221,
+  "released_em": 41.61,
+  "choice_acc": 59.13
+ },
+ "pipe_g2_p5": {
+  "n": 1221,
+  "released_em": 33.09,
+  "choice_acc": 46.76
+ },
+ "print_clean": {
+  "n": 1221,
+  "released_em": 47.42,
+  "choice_acc": 68.06
+ },
+ "print": {
+  "n": 1221,
+  "released_em": 47.75,
+  "choice_acc": 68.3
+ }
+}
