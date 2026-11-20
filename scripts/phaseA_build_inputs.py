@@ -34,6 +34,19 @@ def rng_for(ds, grade, p, i):
     return random.Random(f"{SEED}|{ds}|g{grade}|{p}|{i}")
 
 
+_BRF_LOWER = str.maketrans("@[\\]^", "`{|}~")
+
+
+def bb_ascii(noisy_u, orig_u, orig_a):
+    """Braille ASCII for noisy Unicode, in BrailleBench's lowercase BRF convention.
+
+    Unchanged positions keep the released ASCII character; flipped cells are converted.
+    """
+    assert len(noisy_u) == len(orig_u) == len(orig_a), "length mismatch"
+    return "".join(a if n == o else to_ascii(n).translate(_BRF_LOWER)
+                   for n, o, a in zip(noisy_u, orig_u, orig_a))
+
+
 def corrupt(u, p, rng):
     """Flip dots in Unicode braille u (U+2800 blanks); returns Unicode with U+2800 blanks."""
     return noise.flip_dots(normalize(u), p, rng).replace(" ", BLANK)
@@ -58,8 +71,9 @@ def main():
             uni = load(f"{a.bb}/data/braille/{ds}/grade{g}/unicode.jsonl")
             asc = load(f"{a.bb}/data/braille/{ds}/grade{g}/ascii.jsonl")
             assert len(uni) == len(asc) == len(base)
-            # Our Unicode->ASCII conversion must reproduce the released ASCII files exactly.
-            bad = sum(to_ascii(normalize(u["braille_question"])) != s["braille_question"]
+            # Our cell-level conversion must agree with the released ASCII wherever both are cells.
+            bad = sum(to_ascii(normalize(u["braille_question"])).translate(_BRF_LOWER).replace(" ", "")
+                      != s["braille_question"].replace(" ", "").replace("\xa0", "")
                       for u, s in zip(uni, asc))
             assert bad == 0, f"{ds} g{g}: {bad} ASCII conversion mismatches"
             for p in RATES:
@@ -71,10 +85,11 @@ def main():
                     ch = [corrupt(c, p, rng) for c in u.get("braille_choices") or []]
                     meta = {"noise_rate": p, "noise_seed": f"{SEED}|{ds}|g{g}|{p}|{i}", "grade": g}
                     ru = dict(u, braille_question=q, **meta)
-                    ra = dict(s, braille_question=to_ascii(normalize(q)), **meta)
+                    ra = dict(s, braille_question=bb_ascii(q, u["braille_question"], s["braille_question"]), **meta)
                     if ch:
                         ru["braille_choices"] = ch
-                        ra["braille_choices"] = [to_ascii(normalize(c)) for c in ch]
+                        ra["braille_choices"] = [bb_ascii(c, oc, oa) for c, oc, oa in
+                                                 zip(ch, u["braille_choices"], s["braille_choices"])]
                     rp = dict(s, **meta)
                     rp["question"] = " ".join(translate.back(normalize(q), g).split())
                     if ch:
@@ -83,6 +98,11 @@ def main():
                     rows["unicode"].append(ru)
                     rows["ascii"].append(ra)
                     rows["pipe"].append(rp)
+                if p == 0:
+                    assert all(r == dict(x, **{k: r[k] for k in ("noise_rate", "noise_seed", "grade")})
+                               for r, x in zip(rows["ascii"], asc)), "clean ASCII differs from release"
+                    assert all(r == dict(x, **{k: r[k] for k in ("noise_rate", "noise_seed", "grade")})
+                               for r, x in zip(rows["unicode"], uni)), "clean Unicode differs from release"
                 for kind, rs in rows.items():
                     name = f"pipe_g{g}_{tag}" if kind == "pipe" else f"g{g}_{kind}_{tag}"
                     with open(f"{d}/{name}.jsonl", "w", encoding="utf8") as f:
