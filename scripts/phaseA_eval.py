@@ -46,6 +46,7 @@ def main():
     ap.add_argument("--max-model-len", type=int, default=8192)
     ap.add_argument("--thinking", action="store_true", help="Qwen3 thinking mode (off by default)")
     ap.add_argument("--no-chat", action="store_true", help="raw prompt, no chat template (diagnostic)")
+    ap.add_argument("--chunk", type=int, default=256, help="items per saved chunk (resume granularity)")
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args()
 
@@ -86,33 +87,49 @@ def main():
             recs = [json.loads(l) for l in open(path, encoding="utf8")][: a.limit]
             cfg_name, fmt = condition_config(cond)
             prompts = [bb.make_braille_prompt(ds, r, bb.CONFIGS[cfg_name], fmt) for r in recs]
+            if ds == "commonsenseqa" and not base_choices:
+                # choices from the clean print record, so a copied noisy choice does not match
+                base_choices.update({i: json.loads(l)["choices"] for i, l in
+                                     enumerate(open(f"{a.inputs}/{ds}/print.jsonl", encoding="utf8"))})
+            # Generate in chunks and append each chunk to the details file as it finishes, so a
+            # job that stops mid-condition resumes from the last saved item.
+            detail = f"{a.out}/{ds}_{cond}_details.jsonl"
+            done = sum(1 for _ in open(detail, encoding="utf8")) if os.path.exists(detail) else 0
+            if done:
+                print(f"{ds} {cond}: resuming at item {done}", flush=True)
             t0 = time.time()
-            outs = llm.generate([chat(p) for p in prompts], sp, use_tqdm=False)
+            for start in range(done, len(recs), a.chunk):
+                idx = range(start, min(start + a.chunk, len(recs)))
+                outs = llm.generate([chat(prompts[i]) for i in idx], sp, use_tqdm=False)
+                with open(detail, "a", encoding="utf8") as f:
+                    for i, o in zip(idx, outs):
+                        r, resp = recs[i], o.outputs[0].text
+                        gold = bb.get_gold_answers(r, ds)
+                        pred = bb.extract_answer(resp)
+                        m = bb.compute_metrics(pred, gold, ds)
+                        if ds == "commonsenseqa":
+                            m["choice"] = choice_correct(resp, base_choices[i], gold)
+                        f.write(json.dumps({"id": r.get("id"), "prompt": prompts[i], "gold": gold,
+                                            "predicted": pred, "metrics": m, "response": resp,
+                                            "finish": o.outputs[0].finish_reason,
+                                            "prompt_tokens": len(o.prompt_token_ids),
+                                            "output_tokens": len(o.outputs[0].token_ids)},
+                                           ensure_ascii=False) + "\n")
             gen_s = time.time() - t0
-            acc, n_trunc, n_prompt_tok = {}, 0, 0
-            with open(f"{a.out}/{ds}_{cond}_details.jsonl", "w", encoding="utf8") as f:
-                for r, p, o in zip(recs, prompts, outs):
-                    resp = o.outputs[0].text
-                    n_trunc += o.outputs[0].finish_reason == "length"
-                    n_prompt_tok += len(o.prompt_token_ids)
-                    gold = bb.get_gold_answers(r, ds)
-                    pred = bb.extract_answer(resp)
-                    m = bb.compute_metrics(pred, gold, ds)
-                    if ds == "commonsenseqa":
-                        # choices from the clean print record, so a copied noisy choice does not match
-                        if not base_choices:
-                            base_choices.update({i: json.loads(l)["choices"] for i, l in
-                                                 enumerate(open(f"{a.inputs}/{ds}/print.jsonl", encoding="utf8"))})
-                        m["choice"] = choice_correct(resp, base_choices[len(acc.get("em", []))], gold)
-                    for k, v in m.items():
-                        acc.setdefault(k, []).append(v)
-                    f.write(json.dumps({"id": r.get("id"), "prompt": p, "gold": gold, "predicted": pred,
-                                        "metrics": m, "response": resp,
-                                        "finish": o.outputs[0].finish_reason}, ensure_ascii=False) + "\n")
+            rows = [json.loads(l) for l in open(detail, encoding="utf8")]
+            assert len(rows) == len(recs), f"{detail}: {len(rows)} rows for {len(recs)} items"
+            acc = {}
+            for row in rows:
+                for k, v in row["metrics"].items():
+                    acc.setdefault(k, []).append(v)
+            n_trunc = sum(row["finish"] == "length" for row in rows)
+            ptok = [row["prompt_tokens"] for row in rows if "prompt_tokens" in row]
+            otok = [row["output_tokens"] for row in rows if "output_tokens" in row]
             summ = {k: round(100 * sum(v) / len(v), 2) for k, v in acc.items()}
             summ.update(n=len(recs), primary=summ[PRIMARY[ds]], truncated=n_trunc,
-                        mean_prompt_tokens=round(n_prompt_tok / len(recs), 1), gen_seconds=round(gen_s, 1),
-                        bb_config=cfg_name, format=fmt)
+                        mean_prompt_tokens=round(sum(ptok) / len(ptok), 1) if ptok else None,
+                        mean_output_tokens=round(sum(otok) / len(otok), 1) if otok else None,
+                        gen_seconds=round(gen_s, 1), bb_config=cfg_name, format=fmt)
             results[f"{ds}/{cond}"] = summ
             print(f"{ds:14s} {cond:18s} {summ['primary']:6.2f}  trunc={n_trunc} "
                   f"ptok={summ['mean_prompt_tokens']} {gen_s:.0f}s", flush=True)

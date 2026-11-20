@@ -26,3 +26,4 @@ liblouis-*/
 # per-item eval outputs stay on project storage, not in git
 exp/**/*_details.jsonl
 exp/toy/**/train.log
+exp/phaseA/bb_print_repro/*.jsonl
