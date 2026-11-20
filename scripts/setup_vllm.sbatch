@@ -14,7 +14,7 @@ source /gpfs/projects/stf/stelli/braille_tokenizer_internal/scripts/env.sh
 deactivate 2>/dev/null || true
 cd "$BRL_SCRATCH"
 rm -rf venv-vllm
-~/.local/bin/uv venv --python /usr/bin/python3.12 venv-vllm
+~/.local/bin/uv python install 3.12 && ~/.local/bin/uv venv --managed-python --python 3.12 venv-vllm  # managed Python ships Python.h, which Triton needs
 source venv-vllm/bin/activate
 ~/.local/bin/uv pip install vllm "math-verify==0.9.0" "latex2sympy2_extended==1.11.0" \
   "antlr4-python3-runtime==4.13.2" huggingface_hub numpy tokenizers rapidfuzz
