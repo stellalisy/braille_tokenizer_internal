@@ -21,8 +21,22 @@ def f(x):
     return "" if x is None else f"{x:.1f}"
 
 
+def load(run):
+    """A run's result.json, or the merged result.json files of its shard subfolders."""
+    if os.path.exists(f"{run}/result.json"):
+        return json.load(open(f"{run}/result.json"))
+    merged = {}
+    for sub in sorted(os.listdir(run)):
+        p = f"{run}/{sub}/result.json"
+        if os.path.exists(p):
+            for k, v in json.load(open(p)).items():
+                assert k not in merged, f"{k} in two shards of {run}"
+                merged[k] = v
+    return merged
+
+
 def main(runs):
-    res = {os.path.basename(r.rstrip("/")): json.load(open(f"{r}/result.json")) for r in runs}
+    res = {os.path.basename(r.rstrip("/")): load(r) for r in runs}
     print("### Clean input\n")
     print("| Run | Dataset | Print | Print (preprocessed) | ASCII G1 | ASCII G2 | Unicode G1 | Unicode G2 | Pipeline G1 | Pipeline G2 | Gap closed G1 | Gap closed G2 |")
     print("|" + "---|" * 12)
