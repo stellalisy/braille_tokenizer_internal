@@ -1,0 +1,18 @@
+params 709,820 vocab 66 frames 4 pieces 90366 kept 0.9994
+step 250 loss 2.859 dev CER 0.7351 exact 0.000 40s
+step 500 loss 1.547 dev CER 0.2458 exact 0.000 78s
+step 750 loss 0.958 dev CER 0.1596 exact 0.015 118s
+step 1000 loss 0.746 dev CER 0.1081 exact 0.035 156s
+step 1250 loss 0.559 dev CER 0.0663 exact 0.130 195s
+step 1500 loss 0.457 dev CER 0.0414 exact 0.195 234s
+step 1750 loss 0.373 dev CER 0.0295 exact 0.310 270s
+step 2000 loss 0.379 dev CER 0.0250 exact 0.400 310s
+step 2250 loss 0.290 dev CER 0.0201 exact 0.465 349s
+step 2500 loss 0.262 dev CER 0.0169 exact 0.505 386s
+step 2750 loss 0.299 dev CER 0.0164 exact 0.530 423s
+step 3000 loss 0.392 dev CER 0.0153 exact 0.555 460s
+step 3250 loss 0.244 dev CER 0.0131 exact 0.615 500s
+step 3500 loss 0.231 dev CER 0.0125 exact 0.625 538s
+step 3750 loss 0.230 dev CER 0.0122 exact 0.625 575s
+step 4000 loss 0.322 dev CER 0.0110 exact 0.625 614s
+test {"0": {"cer": 0.0107, "exact": 0.622}, "0.01": {"cer": 0.019, "exact": 0.418}, "0.02": {"cer": 0.0263, "exact": 0.296}, "0.05": {"cer": 0.0498, "exact": 0.094}, "0.1": {"cer": 0.0899, "exact": 0.018}}

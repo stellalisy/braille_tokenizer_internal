@@ -1,0 +1,187 @@
+{
+ "args": {
+  "data": "data",
+  "tokdir": "runs/tokenizers",
+  "tok": "cell",
+  "bpe_size": 8000,
+  "embed": "table",
+  "frames": 0,
+  "chunk_words": 8,
+  "dim": 128,
+  "layers": 3,
+  "steps": 4000,
+  "bs": 48,
+  "lr": 0.001,
+  "train_noise": 0.05,
+  "noise_copies": 4,
+  "eval_noise": "0.01,0.02,0.05,0.1",
+  "train_limit": 0,
+  "seed": 1,
+  "threads": 1,
+  "out": "runs/cell_table_noise_s1"
+ },
+ "params": 709820,
+ "frames": 4,
+ "kept_train": 0.9994248932734633,
+ "train_pieces": 90366,
+ "vocab": 66,
+ "curve": [
+  {
+   "step": 250,
+   "loss": 2.8589,
+   "dev_cer": 0.7351,
+   "dev_exact": 0.0,
+   "seconds": 39.7
+  },
+  {
+   "step": 500,
+   "loss": 1.5467,
+   "dev_cer": 0.2458,
+   "dev_exact": 0.0,
+   "seconds": 78.2
+  },
+  {
+   "step": 750,
+   "loss": 0.9577,
+   "dev_cer": 0.1596,
+   "dev_exact": 0.015,
+   "seconds": 117.7
+  },
+  {
+   "step": 1000,
+   "loss": 0.7462,
+   "dev_cer": 0.1081,
+   "dev_exact": 0.035,
+   "seconds": 155.8
+  },
+  {
+   "step": 1250,
+   "loss": 0.5594,
+   "dev_cer": 0.0663,
+   "dev_exact": 0.13,
+   "seconds": 195.2
+  },
+  {
+   "step": 1500,
+   "loss": 0.4565,
+   "dev_cer": 0.0414,
+   "dev_exact": 0.195,
+   "seconds": 233.6
+  },
+  {
+   "step": 1750,
+   "loss": 0.3726,
+   "dev_cer": 0.0295,
+   "dev_exact": 0.31,
+   "seconds": 269.9
+  },
+  {
+   "step": 2000,
+   "loss": 0.3788,
+   "dev_cer": 0.025,
+   "dev_exact": 0.4,
+   "seconds": 310.1
+  },
+  {
+   "step": 2250,
+   "loss": 0.2895,
+   "dev_cer": 0.0201,
+   "dev_exact": 0.465,
+   "seconds": 349.2
+  },
+  {
+   "step": 2500,
+   "loss": 0.262,
+   "dev_cer": 0.0169,
+   "dev_exact": 0.505,
+   "seconds": 386.0
+  },
+  {
+   "step": 2750,
+   "loss": 0.2993,
+   "dev_cer": 0.0164,
+   "dev_exact": 0.53,
+   "seconds": 423.2
+  },
+  {
+   "step": 3000,
+   "loss": 0.3919,
+   "dev_cer": 0.0153,
+   "dev_exact": 0.555,
+   "seconds": 459.9
+  },
+  {
+   "step": 3250,
+   "loss": 0.2443,
+   "dev_cer": 0.0131,
+   "dev_exact": 0.615,
+   "seconds": 499.6
+  },
+  {
+   "step": 3500,
+   "loss": 0.2309,
+   "dev_cer": 0.0125,
+   "dev_exact": 0.625,
+   "seconds": 537.7
+  },
+  {
+   "step": 3750,
+   "loss": 0.2305,
+   "dev_cer": 0.0122,
+   "dev_exact": 0.625,
+   "seconds": 575.3
+  },
+  {
+   "step": 4000,
+   "loss": 0.3218,
+   "dev_cer": 0.011,
+   "dev_exact": 0.625,
+   "seconds": 613.6
+  }
+ ],
+ "test": {
+  "0": {
+   "cer": 0.0107,
+   "exact": 0.622
+  },
+  "0.01": {
+   "cer": 0.019,
+   "exact": 0.418
+  },
+  "0.02": {
+   "cer": 0.0263,
+   "exact": 0.296
+  },
+  "0.05": {
+   "cer": 0.0498,
+   "exact": 0.094
+  },
+  "0.1": {
+   "cer": 0.0899,
+   "exact": 0.018
+  }
+ },
+ "train_seconds": 618.0,
+ "examples": [
+  {
+   "ref": "If I find him conversable, I shall be glad of his acquaintance; but if he is only a chattering coxcomb, he will not occupy much of my time or thoughts.\"",
+   "hyp": "If I find him conversable, I shall be glad of his acquaintance; but if he is only a chattering coxcomb, he will not occupy much of my time or thoughts.\""
+  },
+  {
+   "ref": "\"Upon my word,\" she cried, \"the young man is determined not to lose any thing for want of asking.",
+   "hyp": "\"UYon my word,\" she cried, \"the young man is determined not to lose any thing for want of asking."
+  },
+  {
+   "ref": "\"We shall never agree about him,\" cried Emma; \"but that is nothing extraordinary.",
+   "hyp": "\"Wer shall never agree about him,\" cried Emma; \"but that is nothing extraordinary."
+  },
+  {
+   "ref": "\"Emma,\" said she, \"this paper is worse than I expected.",
+   "hyp": "\"Emma,\" said she, \"this paper is worse than I expected."
+  },
+  {
+   "ref": "He stopped in his earnestness to look the question, and the expression of his eyes overpowered her.",
+   "hyp": "He stopped in his earnestness to look the question, and the expression of his eyes overpowered her."
+  }
+ ]
+}

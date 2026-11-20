@@ -1,0 +1,77 @@
+{
+ "test_sentences": 500,
+ "test_words": 8872,
+ "test_cells": 29037,
+ "print_chars": 48093,
+ "rows": [
+  {
+   "tokenizer": "T1 cell",
+   "vocab": 66,
+   "test_tokens": 29037,
+   "tokens_per_word": 3.273,
+   "chars_per_token": 1.66,
+   "unk": 0
+  },
+  {
+   "tokenizer": "T2 BPE 1000",
+   "vocab": 1000,
+   "test_tokens": 17457,
+   "tokens_per_word": 1.968,
+   "chars_per_token": 2.75,
+   "unk": 0
+  },
+  {
+   "tokenizer": "T2 BPE 4000",
+   "vocab": 4000,
+   "test_tokens": 13169,
+   "tokens_per_word": 1.484,
+   "chars_per_token": 3.65,
+   "unk": 0
+  },
+  {
+   "tokenizer": "T2 BPE 8000",
+   "vocab": 8000,
+   "test_tokens": 11784,
+   "tokens_per_word": 1.328,
+   "chars_per_token": 4.08,
+   "unk": 0
+  },
+  {
+   "tokenizer": "T2 BPE 16000",
+   "vocab": 16000,
+   "test_tokens": 10767,
+   "tokens_per_word": 1.214,
+   "chars_per_token": 4.47,
+   "unk": 0
+  },
+  {
+   "tokenizer": "T3 rule units",
+   "vocab": 1546,
+   "test_tokens": 26437,
+   "tokens_per_word": 2.98,
+   "chars_per_token": 1.82,
+   "unk": 0
+  },
+  {
+   "tokenizer": "T3 rule units, no lexicon",
+   "vocab": 1546,
+   "test_tokens": 26197,
+   "tokens_per_word": 2.953,
+   "chars_per_token": 1.84,
+   "unk": 0
+  }
+ ],
+ "rule_segmentation": {
+  "T3 rule units": {
+   "word_agreement": 0.9972,
+   "sentence_agreement": 0.95
+  },
+  "T3 rule units, no lexicon": {
+   "word_agreement": 0.9704,
+   "sentence_agreement": 0.624
+  }
+ },
+ "test_words_in_lexicon": 0.9407,
+ "lexicon_size": 55038,
+ "rule_multi_cell_units": 632
+}

@@ -1,0 +1,16 @@
+[project]
+name = "brltok"
+version = "0.1.0"
+description = "Braille tokenizers and a toy back-translation testbed"
+requires-python = ">=3.10"
+dependencies = ["numpy", "tokenizers"]
+
+[project.optional-dependencies]
+train = ["torch", "rapidfuzz", "nltk"]
+test = ["pytest"]
+
+[tool.setuptools]
+packages = ["brltok"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

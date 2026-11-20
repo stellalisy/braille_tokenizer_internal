@@ -1,0 +1,25 @@
+# data and checkpoints
+data/
+data
+*.pt
+*.pth
+*.safetensors
+*.bin
+checkpoints/
+exp/**/ckpt*/
+exp/**/checkpoint*/
+# caches and envs
+__pycache__/
+*.pyc
+.pytest_cache/
+.cache/
+.venv
+.venv/
+*.egg-info/
+# scheduler logs
+slurm-*.out
+logs/slurm/
+*.err
+# local builds
+liblouis-local/
+liblouis-*/
