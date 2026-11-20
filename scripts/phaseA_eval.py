@@ -56,7 +56,8 @@ def main():
 
     os.makedirs(a.out, exist_ok=True)
     llm = LLM(model=a.model, revision=a.revision, dtype="bfloat16", seed=a.seed,
-              max_model_len=a.max_model_len, enable_prefix_caching=True)
+              max_model_len=a.max_model_len, enable_prefix_caching=True,
+              gpu_memory_utilization=0.85)   # default (1.0) left no room for activations: OOM
     tok = llm.get_tokenizer()
     sp = SamplingParams(temperature=0.0, max_tokens=a.max_tokens, seed=a.seed)
 
@@ -68,6 +69,9 @@ def main():
                                        add_generation_prompt=True, **kw)
 
     results, input_hashes = {}, {}
+    if os.path.exists(f"{a.out}/result.json"):        # resume: keep finished conditions
+        results = json.load(open(f"{a.out}/result.json"))
+        print("resuming; done:", sorted(results), flush=True)
     for ds in a.datasets.split(","):
         conds = sorted(f[:-6] for f in os.listdir(f"{a.inputs}/{ds}") if f.endswith(".jsonl"))
         if a.conditions != "all":
@@ -75,6 +79,8 @@ def main():
         for cond in conds:
             path = f"{a.inputs}/{ds}/{cond}.jsonl"
             input_hashes[f"{ds}/{cond}"] = sha256(path)
+            if f"{ds}/{cond}" in results and a.limit is None:
+                continue
             recs = [json.loads(l) for l in open(path, encoding="utf8")][: a.limit]
             cfg_name, fmt = condition_config(cond)
             prompts = [bb.make_braille_prompt(ds, r, bb.CONFIGS[cfg_name], fmt) for r in recs]
