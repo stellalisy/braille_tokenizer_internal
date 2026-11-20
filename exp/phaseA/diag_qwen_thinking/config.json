@@ -1,0 +1,24 @@
+{
+ "command": "python scripts/phaseA_eval.py --model Qwen/Qwen3-1.7B --revision 70d244cc86ccca08cf5af4e1e306ecf908b1ad5e --out exp/phaseA/diag_qwen_thinking --thinking --conditions print,print_clean",
+ "git_commit": "7ffed21898c138852b3eb61188b1be9996e73ad3",
+ "model": "Qwen/Qwen3-1.7B",
+ "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+ "thinking": true,
+ "chat_template": true,
+ "seed": 0,
+ "decoding": {
+  "temperature": 0.0,
+  "max_tokens": 1024
+ },
+ "vllm": "0.34.0",
+ "liblouis": "3.32.0",
+ "braillebench_commit": "ca8997a7762e625b42887974920e89a9785eaa31",
+ "inputs_manifest": "f3cec0994cdf22e6d615d23a2543a7bd5ce8705c",
+ "input_sha256": {
+  "gsm8k/print": "e4d811b70133313b649a4228ccb1643e7ac33b3e9465348ee526bc5f71ed24e8",
+  "gsm8k/print_clean": "b3f41accd98a285dd3cc58507aa5840a08ddd7c060b42ac679b3529b42613531",
+  "commonsenseqa/print": "f79c179b3093e390ae71c5a3d988005ea23217d8c7717182f851d5374a101cd3",
+  "commonsenseqa/print_clean": "17476a25661b885075f1b8f955f0bf3143dece59153a32d1c8bb6e40802116e1"
+ },
+ "slurm_job": "504627"
+}

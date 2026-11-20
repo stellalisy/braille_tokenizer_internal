@@ -23,3 +23,6 @@ logs/slurm/
 # local builds
 liblouis-local/
 liblouis-*/
+# per-item eval outputs stay on project storage, not in git
+exp/**/*_details.jsonl
+exp/toy/**/train.log

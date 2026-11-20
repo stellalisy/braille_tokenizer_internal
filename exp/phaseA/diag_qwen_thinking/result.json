@@ -1,0 +1,52 @@
+{
+ "gsm8k/print": {
+  "em": 59.21,
+  "sub_em": 71.72,
+  "f1": 63.09,
+  "math_verify": 69.6,
+  "n": 1319,
+  "primary": 69.6,
+  "truncated": 849,
+  "mean_prompt_tokens": 96.0,
+  "gen_seconds": 35.6,
+  "bb_config": "EN-EN",
+  "format": null
+ },
+ "gsm8k/print_clean": {
+  "em": 57.7,
+  "sub_em": 70.36,
+  "f1": 61.89,
+  "math_verify": 68.31,
+  "n": 1319,
+  "primary": 68.31,
+  "truncated": 844,
+  "mean_prompt_tokens": 95.4,
+  "gen_seconds": 35.2,
+  "bb_config": "EN-EN",
+  "format": null
+ },
+ "commonsenseqa/print": {
+  "em": 34.64,
+  "sub_em": 35.95,
+  "f1": 35.56,
+  "n": 1221,
+  "primary": 34.64,
+  "truncated": 126,
+  "mean_prompt_tokens": 70.5,
+  "gen_seconds": 16.0,
+  "bb_config": "EN-EN",
+  "format": null
+ },
+ "commonsenseqa/print_clean": {
+  "em": 34.48,
+  "sub_em": 35.71,
+  "f1": 35.44,
+  "n": 1221,
+  "primary": 34.48,
+  "truncated": 126,
+  "mean_prompt_tokens": 70.3,
+  "gen_seconds": 15.6,
+  "bb_config": "EN-EN",
+  "format": null
+ }
+}

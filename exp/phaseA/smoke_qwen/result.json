@@ -1,0 +1,102 @@
+{
+ "gsm8k/g1_ascii_p0": {
+  "em": 0.0,
+  "sub_em": 10.0,
+  "f1": 0.0,
+  "math_verify": 10.0,
+  "n": 20,
+  "primary": 10.0,
+  "truncated": 2,
+  "mean_prompt_tokens": 121.7,
+  "gen_seconds": 2.4,
+  "bb_config": "G1-EN",
+  "format": "ascii"
+ },
+ "gsm8k/g1_unicode_p5": {
+  "em": 0.0,
+  "sub_em": 0.0,
+  "f1": 0.0,
+  "math_verify": 0.0,
+  "n": 20,
+  "primary": 0.0,
+  "truncated": 19,
+  "mean_prompt_tokens": 505.6,
+  "gen_seconds": 3.1,
+  "bb_config": "G1-EN",
+  "format": "unicode"
+ },
+ "gsm8k/pipe_g2_p0": {
+  "em": 85.0,
+  "sub_em": 85.0,
+  "f1": 85.0,
+  "math_verify": 85.0,
+  "n": 20,
+  "primary": 85.0,
+  "truncated": 0,
+  "mean_prompt_tokens": 99.4,
+  "gen_seconds": 1.1,
+  "bb_config": "EN-EN",
+  "format": null
+ },
+ "gsm8k/print": {
+  "em": 75.0,
+  "sub_em": 75.0,
+  "f1": 75.0,
+  "math_verify": 75.0,
+  "n": 20,
+  "primary": 75.0,
+  "truncated": 0,
+  "mean_prompt_tokens": 100.0,
+  "gen_seconds": 1.1,
+  "bb_config": "EN-EN",
+  "format": null
+ },
+ "commonsenseqa/g1_ascii_p0": {
+  "em": 20.0,
+  "sub_em": 50.0,
+  "f1": 42.67,
+  "n": 20,
+  "primary": 20.0,
+  "truncated": 0,
+  "mean_prompt_tokens": 98.4,
+  "gen_seconds": 0.5,
+  "bb_config": "G1-EN",
+  "format": "ascii"
+ },
+ "commonsenseqa/g1_unicode_p5": {
+  "em": 0.0,
+  "sub_em": 0.0,
+  "f1": 0.0,
+  "n": 20,
+  "primary": 0.0,
+  "truncated": 0,
+  "mean_prompt_tokens": 307.5,
+  "gen_seconds": 0.2,
+  "bb_config": "G1-EN",
+  "format": "unicode"
+ },
+ "commonsenseqa/pipe_g2_p0": {
+  "em": 35.0,
+  "sub_em": 35.0,
+  "f1": 35.0,
+  "n": 20,
+  "primary": 35.0,
+  "truncated": 0,
+  "mean_prompt_tokens": 72.0,
+  "gen_seconds": 0.0,
+  "bb_config": "EN-EN",
+  "format": null
+ },
+ "commonsenseqa/print": {
+  "em": 40.0,
+  "sub_em": 40.0,
+  "f1": 40.0,
+  "n": 20,
+  "primary": 40.0,
+  "truncated": 0,
+  "mean_prompt_tokens": 72.1,
+  "gen_seconds": 0.0,
+  "bb_config": "EN-EN",
+  "format": null
+ }
+}

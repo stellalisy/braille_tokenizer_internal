@@ -1,0 +1,1 @@
+{"command": "python scripts/train_backtranslate.py --tok cell --embed dots --train-noise 0.05 --steps 4000 --seed 1 --threads 1 --out exp/toy/noise_seeds/cell_dots_noise_s1", "git_commit": "e8addf543f76ee3ec3abafb35b10e166cb7ecb72", "liblouis": "3.32.0", "data": "scripts/build_data.py --out data --test-sentences test_sentences.json (seed 0)", "slurm_job": "504490"}
