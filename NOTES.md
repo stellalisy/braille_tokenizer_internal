@@ -39,3 +39,4 @@ Decisions, assumptions, dead ends, and deviations from the outline. Newest last.
 - **Diagnostic runs** `exp/phaseA/diag_qwen_thinking` and `exp/phaseA/diag_llama_nochat` cover print conditions only.
 - **Toy five-seed rerun** of E1 vs E3 under noise is done (`exp/toy/noise_seeds/`, summary in `summary.json`).
 - **GPU use so far:** 1.41 GPU-hours on full H200s (sacct) for all Phase A runs, smoke tests, and diagnostics.
+- **Generation limit raised to 8,192 new tokens** (Stella, 2026-11-20: 1,024 is too short). Phase A is rerun for Qwen thinking off, Qwen thinking on, and Llama into `exp/phaseA/*-8k/` (jobs 504794 to 504796, max model length 10,240). The 1,024-token runs stay as the BrailleBench replication. If thinking-on print still truncates more than a few percent at 8,192, the limit goes up again.
