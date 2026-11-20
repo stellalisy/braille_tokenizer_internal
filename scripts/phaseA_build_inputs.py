@@ -72,8 +72,9 @@ def main():
             asc = load(f"{a.bb}/data/braille/{ds}/grade{g}/ascii.jsonl")
             assert len(uni) == len(asc) == len(base)
             # Our cell-level conversion must agree with the released ASCII wherever both are cells.
-            bad = sum(to_ascii(normalize(u["braille_question"])).translate(_BRF_LOWER).replace(" ", "")
-                      != s["braille_question"].replace(" ", "").replace("\xa0", "")
+            # (Whitespace is ignored: a few sources carry tabs or NBSPs that liblouis passes through.)
+            bad = sum("".join(to_ascii(normalize(u["braille_question"])).translate(_BRF_LOWER).split())
+                      != "".join(s["braille_question"].split())
                       for u, s in zip(uni, asc))
             assert bad == 0, f"{ds} g{g}: {bad} ASCII conversion mismatches"
             for p in RATES:
