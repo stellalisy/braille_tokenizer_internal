@@ -76,3 +76,7 @@ Phase B preparation (CPU):
 - B4. A unit test shows the base parameter hash is unchanged after a training step.
 
 If all pass, training starts with thinking off (my recommendation, which Stella has not overruled), short debug runs first. If any fails, I report and wait.
+
+## 2026-11-20. Gate A5: human-authored test set
+
+BrailleLLM (github.com/Tianyuan-Huang/BrailleLLM at 30d3c41) releases only Chinese data, so it cannot be the English human set. Used the ICEB rulebook examples that liblouis 3.32.0 ships in `tests/braille-specs/en-ueb.yaml` instead (provenance in the file header; 96 entries with emphasis or mode options skipped). The braille display is NABCC, converted with the lowercase BRF mapping; liblouis forward output matches 97.9% of items, which confirms the conversion. A5 is met for word and phrase level only; a running-text English set remains an open item and does not block Phase B.

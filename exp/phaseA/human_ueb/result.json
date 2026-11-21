@@ -1,0 +1,27 @@
+{
+ "result": {
+  "g1": {
+   "n": 58,
+   "n_xfail": 0,
+   "mean_print_chars": 2.2,
+   "forward_match": 100.0,
+   "back_exact": 93.1,
+   "back_cer": 13.18
+  },
+  "g2": {
+   "n": 1057,
+   "n_xfail": 22,
+   "mean_print_chars": 9.7,
+   "forward_match": 97.92,
+   "back_exact": 91.96,
+   "back_cer": 4.29
+  }
+ },
+ "skipped": {
+  "en-ueb.yaml": 96,
+  "en-ueb-g1_harness.yaml": 9
+ },
+ "command": "python scripts/human_ueb_testset.py --specs /gpfs/scrubbed/stelli/braille/liblouis-3.32.0/tests/braille-specs --out data/human/ueb_rulebook.jsonl --result exp/phaseA/human_ueb/result.json",
+ "git_commit": "ea42b8c692b98b74340a8ea3fee9a443ec5b3f80",
+ "liblouis": "3.32.0"
+}

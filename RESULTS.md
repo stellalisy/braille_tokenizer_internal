@@ -94,3 +94,13 @@ T1 cell tokenizer, trained with 5% flips, 4,000 steps, CER (%) on the 500 test s
 | liblouis 3.32 | 0.35 | 1.58 | 2.71 | 6.10 | 12.05 |
 
 The two-seed lead holds with five seeds. Dot-composed embeddings lower CER at 10% flips by 4.8% (relative) on average, and they win in all five seeds (gains of 2.2% to 7.6%). On clean text the two are level. Both noise-trained models beat liblouis from 2% flips upward, by 28% (E3) and 25% (E1) relative at 10%. These numbers measure agreement with liblouis on 19th-century fiction. Runs are in `exp/toy/noise_seeds/`.
+
+## Phase A step 6. Human-authored test set (2026-11-20)
+
+The Grade 2 set is the 1,057 plain-text examples from *The Rules of Unified English Braille* (ICEB) that liblouis keeps as tests (`en-ueb.yaml`). The braille was written by the rulebook authors. Items are words and short phrases, 9.7 print characters on average. The Grade 1 harness (Torch Trust) adds 58 items of about 2 characters and is too small to use. Built by `scripts/human_ueb_testset.py`, data in `data/human/ueb_rulebook.jsonl`, scores in `exp/phaseA/human_ueb/result.json`.
+
+| Set | n | liblouis forward matches the human braille | Back-translation exact | Back-translation CER |
+|---|---|---|---|---|
+| Grade 2 rulebook | 1,057 | 97.9% | 92.0% | 4.3% |
+
+liblouis is developed against these examples, so its score is in-sample. The set measures learned models against human braille, and it covers rule cases that liblouis output never shows a model. It has no running text. Human-transcribed English sentences are still missing, and the BrailleLLM release contains only Chinese data (49,554 training and 1,000 test pairs), which serves Phase E.
