@@ -136,4 +136,4 @@ Qwen3 1.7B, frozen, no training. Mean NLL of the print sentence after "Braille: 
 | T2 BPE 8k, E1 / E2 | 5.24 / 0.83 | 5.24 / 0.91 |
 | T3 rule units, E1 / E2 | 6.64 / 0.66 | 6.30 / 0.66 |
 
-Print-aligned initialization alone lets the frozen model read braille. Rule units with E2 lower the Grade 2 loss by 76% relative to the stock tokenizer on Braille ASCII and win on all 200 sentences; in Grade 1 they lower it by 20% and win on 142 of 200. E2 beats E1 for every tokenizer, by 54% to 90%. Cells gain least, because under the first-cell rule many cells have no print expansion (gate B2). B3 passes for both grades.
+Print-aligned initialization alone lets the frozen model read braille. Rule units with E2 lower the Grade 2 loss by 76% relative to the stock tokenizer on Braille ASCII and win on all 200 sentences; in Grade 1 they lower it by 20% and win on 142 of 200. E2 beats E1 for every tokenizer, by 46% to 90%. Cells gain least, because under the first-cell rule many cells have no print expansion (gate B2). B3 passes for both grades.
