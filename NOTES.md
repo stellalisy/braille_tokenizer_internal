@@ -111,3 +111,20 @@ With the gate met, Phase B GPU training is approved, thinking off. Debug runs fi
 ## 2026-11-20. Gate B3 passes
 
 Grade 1 and Grade 2 both pass (RESULTS.md). All gates are met except A4, whose remaining runs are Qwen thinking on Unicode braille and cannot change A1 to A3. Phase B training starts.
+
+## 2026-11-21 Phase A complete; Phase B stage 1 design
+
+Phase A is complete. The last runs (Qwen thinking on, Unicode Grade 2) score 0.5 on GSM8K and 0.0 on CommonsenseQA, like every other Unicode condition. Job 504804 hit its 20 h limit after finishing its Grade 1 Unicode conditions, and the per-condition jobs covered the rest. Phase A used 101 GPU-hours in total (sacct, jobs named brl-phaseA).
+
+Phase B stage 1 decisions, fixed before the grid:
+
+- **What trains.** Only the braille embedding module. The base model is frozen, and its parameter hash is checked at the start and end of every run (`base_unchanged` in `train_log.json`).
+- **Grades.** One run per grade, each with that grade's tokenizer, embeddings and data. Grade 1 first, since Checkpoint 2 is about Grade 1.
+- **Examples.** Half of each batch is transcription (`"Braille:" + braille + "\nPrint:"` followed by the print sentence, from `data/phaseB/train.jsonl`). The other half is QA: BrailleBench's braille-input prompt (G1-EN or G2-EN, with its "Unicode Braille characters" note), in the chat template with thinking off, with question and choices spliced in as braille spans.
+- **QA targets.** The QA target is the frozen model's own print answer to the same question (`scripts/phaseB_qa_targets.py`, GSM8K train and CommonsenseQA train). Every answer is kept, right or wrong, so training pushes braille toward print behavior rather than toward gold answers. That keeps the gap-closed metric honest: a braille score above print would mean something leaked. The frozen model gets 86.7% of GSM8K train and 64.7% of CommonsenseQA train right; 7 of 17,214 answers hit the token limit and were dropped. 250 items per dataset are held out as QA-dev.
+- **Spacing.** Print text right before a braille span drops its trailing space, because a word-start braille token already stands for a print token with a leading space (E2).
+- **Loss.** LM loss on the target, plus λ times distillation. The distillation term is the squared error between the student hidden state at the last token of each braille word and the frozen model's hidden state at the last token of the same print word, divided by the teacher's squared norm. It is averaged over words and over layers 4, 8 and 14 (of 28). λ = 1. Words pair only when a span has the same number of words in braille and print.
+- **Optimizer.** AdamW at lr 1e-3, no weight decay, 100 warmup steps, then cosine. Batch 16, 3,000 steps, gradient clip 1, seed 0. These are set before any result. Only QA-dev and transcription-dev losses are used to change them.
+- **E3 for every tokenizer.** A cell vector is a linear map of the six dot bits, plus a per-cell residual (zero at start), plus a position vector. A token averages its cells, adds word-start and word-end flags, and a two-layer MLP (512 to 2048 to 2048) maps it to the model dimension (`brltok/composed.py`). It is fitted to the E2 table (3,000 Adam steps, MSE) before training.
+- **Evaluation.** `scripts/phaseB_eval.py` feeds vLLM prompt embeddings and uses Phase A's items, extraction and scoring, thinking off, 8,192 new tokens. The path itself was checked by sending the Phase A print prompts through it on 200 items per dataset. CommonsenseQA responses are identical (200/200). GSM8K accuracy is identical (82.0 both), with 167/200 responses identical character for character; the rest differ by bf16 batch effects over long generations.
+- **Cost.** A debug run takes 0.45 s per training step on one H200, so a 3,000-step run is about 25 minutes plus evaluation.
