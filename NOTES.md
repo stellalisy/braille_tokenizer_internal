@@ -57,3 +57,22 @@ Decisions, assumptions, dead ends, and deviations from the outline. Newest last.
 ## 2026-11-20. CommonsenseQA thinking run split per condition
 
 Job 504804 (Qwen thinking, 32k tokens, CommonsenseQA braille) started before chunked saving and takes about 2.5 hours per Unicode condition (8,881 s for g1_unicode_p0, 516 of 1,221 truncated at 32k). Its remaining conditions would exceed the 20-hour limit. It finishes g1_unicode_p10, then job 505586 cancels it. The other 10 conditions run as per-condition jobs 505576 to 505585 with chunked saving and --requeue, in `exp/phaseA/qwen3-1.7b-thinking-32k/commonsenseqa_<cond>`. `scripts/phaseA_table.py` merges the shard folders and fails if a condition appears twice.
+
+## 2026-11-20. Gate for Phase B training
+
+Stella approved GPU training for Phase B on the condition that the steps before it support the hypothesis. The gate, fixed before looking at any new result:
+
+Phase A (from the eval harness):
+- A1. Stock Qwen3 1.7B on clean GSM8K Grade 1 Braille ASCII is at least 50 points below print. Status: met (82.8 vs 3.4, thinking off, 8k).
+- A2. The pipeline closes at least 90% of the clean gap. Status: met (98% to 100%, every run).
+- A3. The pipeline loses at least 25% of its clean GSM8K accuracy (relative) at 5% flips, so a learned front end has room. Status: met (about 50%).
+- A4. The remaining Phase A runs (thinking 32k, Llama 8k) finish and do not contradict A1 to A3.
+- A5. Step 6: a human-transcribed test set is collected, with provenance, and liblouis back-translation is scored on it.
+
+Phase B preparation (CPU):
+- B1. Training data contains no item from the GSM8K test or CommonsenseQA dev questions (exact and normalized match).
+- B2. Every T1, T2 and T3 token has a print expansion, and at least 95% of training tokens have a non-empty one.
+- B3. Zero-training check of the print-aligned initialization: with the body frozen and no training, the loss of the print continuation given a braille prefix embedded with E2 is lower than with E1 and lower than with the stock tokenizer on Braille ASCII, on a 200-sentence dev sample. This is the first direct test that braille can reach print representations through the input layer alone.
+- B4. A unit test shows the base parameter hash is unchanged after a training step.
+
+If all pass, training starts with thinking off (my recommendation, which Stella has not overruled), short debug runs first. If any fails, I report and wait.
