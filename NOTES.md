@@ -86,3 +86,17 @@ BrailleLLM (github.com/Tianyuan-Huang/BrailleLLM at 30d3c41) releases only Chine
 B3 is judged per grade on the first 200 sentences of `data/phaseB/dev.jsonl`, with one template for every condition: print "Braille: ", then the braille input, then print "\nPrint:", and the loss is the mean negative log-likelihood of " " plus the print sentence. It passes for a grade if (a) E2 has lower loss than E1 for each of T1, T2 (8k) and T3, and (b) the best E2 tokenizer has lower loss than the stock tokenizer reading Braille ASCII. A print-to-print copy with the same template is reported as the floor. Qwen3 1.7B at the Phase A revision, no training, float32 on CPU.
 
 B4 (freeze proof) passes: `tests/test_bridge.py::test_freeze_proof_base_hash_unchanged_after_step` shows the base parameter hash unchanged and no base gradients after an optimizer step on the braille embeddings.
+
+## 2026-11-20. Gates B1 and B2
+
+B1 passes. `data/phaseB` has 284,241 training and 2,000 dev segments (WikiText-103 148k, Dolly 56k, Gutenberg 37k, GSM8K train answers 27k and questions 7k, CommonsenseQA train questions 10k), none of the 2,540 GSM8K test or CommonsenseQA validation questions, exactly or normalized. 1,460 segments were dropped because liblouis wrote untranslatable characters as 8-dot cells. Every segment has equal braille and print word counts in both grades. Manifest in `exp/phaseB/data_manifest.json`.
+
+B2 fails as written, for a reason in the expansion rule rather than the code. Report in `exp/phaseB/tokenizer_report.json`:
+
+| Tokenizer | G1 types with expansion | G1 non-empty share | G2 types with expansion | G2 non-empty share | G2 tokens per word |
+|---|---|---|---|---|---|
+| T1 cell | 44 of 61 | 95.6% | 63 of 64 | 91.8% | 4.83 |
+| T2 BPE 8k | 7,961 of 7,992 | 99.5% | 7,992 of 7,995 | 99.1% | 1.53 |
+| T3 rule units | 1,035 of 1,035 | 100% | 3,018 of 3,018 | 100% | 3.49 |
+
+The instructions give a unit that a token cuts through to the token holding its first cell. Under T1 every multi-cell sign is cut, so its later cells get no expansion (in "had", dots 456 get the word and the h cell gets nothing in that position), and cells that only occur after an indicator never get one. They fall back to mean initialization. T3 passes fully and T2 nearly. Reported to Stella; training waits for her call.

@@ -1,0 +1,30 @@
+{
+ "n_train": 284241,
+ "n_dev": 2000,
+ "n_errors": 1460,
+ "n_8dot_dropped": 1460,
+ "by_source": {
+  "dolly": 55601,
+  "wikitext": 147501,
+  "csqa_q": 9681,
+  "gutenberg": 36601,
+  "gsm8k_a": 27431,
+  "gsm8k_q": 7426
+ },
+ "aligned_g1": 1.0,
+ "aligned_g2": 1.0,
+ "contamination": {
+  "n_test_questions": 2540,
+  "exact": 0,
+  "normalized": 0
+ },
+ "seed": 0,
+ "caps": {
+  "wikitext": 150000,
+  "dolly": 60000
+ },
+ "liblouis": "3.32.0",
+ "command": "python scripts/phaseB_build_data.py --out data/phaseB --workers 8",
+ "git_commit": "b1a5f1257b3bdaaeebee30c09c1e0bd32d72598a",
+ "train_sha256": "f70374ca8d62ae2670ca897b6a937e46c7e1585c7e1385b7829bdc226405216f"
+}

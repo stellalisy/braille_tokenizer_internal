@@ -1,0 +1,52 @@
+{
+ "g1_t1": {
+  "vocab": 66,
+  "types_seen": 61,
+  "types_with_expansion": 44,
+  "token_occurrences": 34715629,
+  "nonempty_share": 0.9555,
+  "tokens_per_word": 6.013
+ },
+ "g1_t2": {
+  "vocab": 8000,
+  "types_seen": 7992,
+  "types_with_expansion": 7961,
+  "token_occurrences": 8855145,
+  "nonempty_share": 0.995,
+  "tokens_per_word": 1.534
+ },
+ "g1_t3": {
+  "vocab": 1146,
+  "types_seen": 1035,
+  "types_with_expansion": 1035,
+  "token_occurrences": 27682479,
+  "nonempty_share": 1.0,
+  "tokens_per_word": 4.795
+ },
+ "g2_t1": {
+  "vocab": 66,
+  "types_seen": 64,
+  "types_with_expansion": 63,
+  "token_occurrences": 27911309,
+  "nonempty_share": 0.9179,
+  "tokens_per_word": 4.834
+ },
+ "g2_t2": {
+  "vocab": 8000,
+  "types_seen": 7995,
+  "types_with_expansion": 7992,
+  "token_occurrences": 8841535,
+  "nonempty_share": 0.9909,
+  "tokens_per_word": 1.531
+ },
+ "g2_t3": {
+  "vocab": 3058,
+  "types_seen": 3018,
+  "types_with_expansion": 3018,
+  "token_occurrences": 20129073,
+  "nonempty_share": 1.0,
+  "tokens_per_word": 3.486
+ },
+ "command": "python scripts/phaseB_tokenizers.py --data data/phaseB",
+ "git_commit": "b1a5f1257b3bdaaeebee30c09c1e0bd32d72598a"
+}

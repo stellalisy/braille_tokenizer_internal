@@ -43,9 +43,9 @@ def keep(s):
     return 3 <= n <= 80 and len(s) <= 500
 
 
-def hf(repo, **kw):
+def hf(repo, *args, **kw):
     from datasets import load_dataset
-    return load_dataset(repo, **kw)
+    return load_dataset(repo, *args, **kw)
 
 
 def collect():
@@ -96,6 +96,9 @@ def translate(item):
             tr = forward(text, g)
         except Exception as e:      # noqa: BLE001  liblouis errors are rare; record and skip
             return {"source": src, "text": text, "error": str(e)}
+        if any(0x2840 <= ord(ch) <= 0x28FF for ch in tr.braille):
+            # liblouis writes characters it cannot translate as 8-dot cells; 6-dot tokenizers skip them
+            return {"source": src, "text": text, "error": "8-dot cell"}
         rec[f"g{g}"] = tr.braille
         rec[f"units_g{g}"] = [[u.cells, u.text] for u in units_from(tr)]
         rec[f"aligned_g{g}"] = len(tr.braille.split()) == len(text.split())
@@ -135,7 +138,7 @@ def main():
     for r in train:
         counts[r["source"]] = counts.get(r["source"], 0) + 1
     manifest = {
-        "n_train": len(train), "n_dev": len(dev), "n_errors": len(errors), "by_source": counts,
+        "n_train": len(train), "n_dev": len(dev), "n_errors": len(errors), "n_8dot_dropped": sum(e["error"] == "8-dot cell" for e in errors), "by_source": counts,
         "aligned_g1": round(sum(r["aligned_g1"] for r in train) / len(train), 4),
         "aligned_g2": round(sum(r["aligned_g2"] for r in train) / len(train), 4),
         "contamination": cont, "seed": SEED, "caps": CAPS, "liblouis": version(),
