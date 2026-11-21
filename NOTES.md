@@ -100,3 +100,10 @@ B2 fails as written, for a reason in the expansion rule rather than the code. Re
 | T3 rule units | 1,035 of 1,035 | 100% | 3,018 of 3,018 | 100% | 3.49 |
 
 The instructions give a unit that a token cuts through to the token holding its first cell. Under T1 every multi-cell sign is cut, so its later cells get no expansion (in "had", dots 456 get the word and the h cell gets nothing in that position), and cells that only occur after an indicator never get one. They fall back to mean initialization. T3 passes fully and T2 nearly. Reported to Stella; training waits for her call.
+
+## 2026-11-20. Stella's decisions on the gate
+
+1. B2 is accepted as met for T2 and T3. T1 tokens without a print expansion fall back to mean initialization under E2.
+2. If B3 Grade 1 had failed against stock Braille ASCII, Grade 2 would decide. It did not come to that: Grade 1 passes (T3 with E2 0.655 against stock ASCII 0.821).
+
+With the gate met, Phase B GPU training is approved, thinking off. Debug runs first, then the T1/T2/T3 by E1/E2/E3 grid on Qwen3 1.7B, budget about 40 to 60 GPU-hours.
