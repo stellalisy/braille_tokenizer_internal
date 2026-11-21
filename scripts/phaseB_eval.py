@@ -40,7 +40,7 @@ def main():
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--chunk", type=int, default=256)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--print-part", choices=["question", "choices"], default=None,
+    ap.add_argument("--print-part", choices=["question", "choices", "all"], default=None,
                     help="diagnostic: give this part of the prompt in print, the rest in braille")
     ap.add_argument("--qa-dev", default="data/phaseB/qa/dev.jsonl",
                     help="items for condition qadev (held-out training questions, for selection)")
@@ -91,9 +91,9 @@ def main():
             return base[tok(p, add_special_tokens=False)["input_ids"]], p
         ch = [Braille(c) for c in r.get("braille_choices", [])] if ds == "commonsenseqa" else []
         q = Braille(r["braille_question"])
-        if a.print_part == "question":
+        if a.print_part in ("question", "all"):
             q = r["question"]
-        elif a.print_part == "choices" and ch:
+        if a.print_part in ("choices", "all") and ch:
             ch = list(r["choices"])
         segs = qa_segments(bb, ds, grade, q, ch, chat=chat)
         ex = build(segs, tok, btok)
