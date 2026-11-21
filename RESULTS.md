@@ -137,3 +137,40 @@ Qwen3 1.7B, frozen, no training. Mean NLL of the print sentence after "Braille: 
 | T3 rule units, E1 / E2 | 6.64 / 0.66 | 6.30 / 0.66 |
 
 Print-aligned initialization alone lets the frozen model read braille. Rule units with E2 lower the Grade 2 loss by 76% relative to the stock tokenizer on Braille ASCII and win on all 200 sentences; in Grade 1 they lower it by 20% and win on 142 of 200. E2 beats E1 for every tokenizer, by 46% to 90%. Cells gain least, because under the first-cell rule many cells have no print expansion (gate B2). B3 passes for both grades.
+
+## Phase B stage 1: frozen-body transplant grid (Qwen3 1.7B, thinking off)
+
+Training only the braille input closes 93% of the Grade 1 GSM8K gap and 94% of the Grade 2 gap, with the base model unchanged. Checkpoint 2 (more than half of the Grade 1 GSM8K gap) is met. The pipeline still closes more (98.7% and 98.3%). The base model's parameter hash matched at the start and end of all 26 training runs.
+
+GSM8K accuracy (%) and gap closed (GC) against print 82.8 and stock Braille ASCII 3.4 (G1) and 1.4 (G2). T3 with E2 and E3 are means over seeds 0 to 2 (standard deviation in brackets); all other cells are seed 0.
+
+| Tokenizer | G1 E1 | G1 E2 | G1 E3 | G2 E1 | G2 E2 | G2 E3 |
+|---|---|---|---|---|---|---|
+| T1 cell | 75.3 (GC 90.5) | 75.9 (91.3) | 76.3 (91.8) | 75.7 (91.2) | 77.6 (93.6) | 76.5 (92.3) |
+| T2 BPE 8k | 59.4 (70.6) | 58.6 (69.5) | 64.4 (76.9) | 62.1 (74.6) | 56.0 (67.1) | 64.5 (77.5) |
+| T3 rule units | 75.0 (90.2) | 77.2 [0.2] (93.0) | 76.9 [0.6] (92.6) | 75.1 (90.5) | 77.8 [0.4] (93.9) | 78.3 [0.5] (94.5) |
+
+CommonsenseQA accuracy (%, choice scoring); print 68.3, stock Braille ASCII 61.8 (G1) and 21.5 (G2), pipeline 68.1.
+
+| Tokenizer | G1 E1 | G1 E2 | G1 E3 | G2 E1 | G2 E2 | G2 E3 |
+|---|---|---|---|---|---|---|
+| T1 cell | 50.2 | 52.0 | 54.5 | 53.6 | 54.0 | 52.1 |
+| T2 BPE 8k | 50.1 | 60.1 | 50.3 | 49.1 | 55.6 | 51.4 |
+| T3 rule units | 54.2 | 54.7 [0.7] | 54.5 [1.0] | 55.5 | 57.1 [0.6] | 56.5 [1.2] |
+
+- **Tokenizer.** It matters more than initialization once training starts. Rule units and cells close 90% to 95% of the GSM8K gap; BPE closes 67% to 78%. Print-aligned (E2) and dot-composed (E3) initialization add 2 to 3 points over mean init (E1) for rule units.
+- **CommonsenseQA.** It transfers less. Grade 2 closes up to 76% of its gap (T3 E2). In Grade 1 every trained input scores below stock Braille ASCII, whose gap is only 6.5 points.
+- **Diagnostic (T3 E2, seed 0, CommonsenseQA).** It locates the Grade 1 loss in reading braille:
+
+  | Question | Choices | G1 | G2 |
+  |---|---|---|---|
+  | braille | braille | 54.0 | 56.9 |
+  | print | braille | 61.4 | 61.7 |
+  | braille | print | 60.6 | 62.8 |
+  | print | print | 69.4 | 69.4 |
+
+  The last row uses the braille-input template with everything in print, so the template itself costs nothing (GSM8K 83.0 and 81.8 in that setting).
+- **Selection.** T3 E2 and T3 E3 were picked for extra seeds by mean accuracy on the held-out training questions (`eval_qadev`, 250 GSM8K + 250 CommonsenseQA), not by test scores.
+- **Cost.** 3,000 steps take 17 to 25 minutes per run on one H200. Stage 1 so far (26 runs, their evaluations, debug runs, QA targets) used 10.5 GPU-hours (sacct, jobs named brl-phaseB).
+
+Runs: `exp/phaseB/train/g{grade}_{tok}_{emb}_s{seed}/` (`train_log.json`, `eval/result.json`, `eval_qadev/`, diagnostics in `eval_print_{question,choices,all}/`). Command: `bash scripts/phaseB_grid.sh <seed> "<grades>" "<toks>" "<embs>"`. Git commit and liblouis 3.32.0 are in each `train_log.json` and `eval/config.json`. Data: `data/phaseB/manifest.json` and `data/phaseB/qa/manifest.json`.
