@@ -80,3 +80,9 @@ If all pass, training starts with thinking off (my recommendation, which Stella 
 ## 2026-11-20. Gate A5: human-authored test set
 
 BrailleLLM (github.com/Tianyuan-Huang/BrailleLLM at 30d3c41) releases only Chinese data, so it cannot be the English human set. Used the ICEB rulebook examples that liblouis 3.32.0 ships in `tests/braille-specs/en-ueb.yaml` instead (provenance in the file header; 96 entries with emphasis or mode options skipped). The braille display is NABCC, converted with the lowercase BRF mapping; liblouis forward output matches 97.9% of items, which confirms the conversion. A5 is met for word and phrase level only; a running-text English set remains an open item and does not block Phase B.
+
+## 2026-11-20. Gate B3 made precise (before running it)
+
+B3 is judged per grade on the first 200 sentences of `data/phaseB/dev.jsonl`, with one template for every condition: print "Braille: ", then the braille input, then print "\nPrint:", and the loss is the mean negative log-likelihood of " " plus the print sentence. It passes for a grade if (a) E2 has lower loss than E1 for each of T1, T2 (8k) and T3, and (b) the best E2 tokenizer has lower loss than the stock tokenizer reading Braille ASCII. A print-to-print copy with the same template is reported as the floor. Qwen3 1.7B at the Phase A revision, no training, float32 on CPU.
+
+B4 (freeze proof) passes: `tests/test_bridge.py::test_freeze_proof_base_hash_unchanged_after_step` shows the base parameter hash unchanged and no base gradients after an optimizer step on the braille embeddings.
