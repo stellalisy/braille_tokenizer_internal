@@ -104,3 +104,36 @@ The Grade 2 set is the 1,057 plain-text examples from *The Rules of Unified Engl
 | Grade 2 rulebook | 1,057 | 97.9% | 92.0% | 4.3% |
 
 liblouis is developed against these examples, so its score is in-sample. The set measures learned models against human braille, and it covers rule cases that liblouis output never shows a model. It has no running text. Human-transcribed English sentences are still missing, and the BrailleLLM release contains only Chinese data (49,554 training and 1,000 test pairs), which serves Phase E.
+
+## Phase A with longer limits and choice scoring (2026-11-20)
+
+These runs replace the 1,024-token tables above. Thinking off uses 8,192 new tokens and thinking on uses 32,768. CommonsenseQA is scored with `brltok.scoring.choice_correct`, which counts a letter answer as that choice (NOTES.md, 2026-11-20). Raw outputs are in `exp/phaseA/qwen3-1.7b-8k`, `llama3.1-8b-instruct-8k` and `qwen3-1.7b-thinking-32k`. Qwen with thinking on Unicode braille is still running.
+
+| Model | Dataset | Print | ASCII G1 | ASCII G2 | Unicode G1 | Unicode G2 | Pipeline G1 | Pipeline G2 |
+|---|---|---|---|---|---|---|---|---|
+| Qwen3 1.7B, thinking off | GSM8K | 82.8 | 3.4 | 1.4 | 0.5 | 0.5 | 81.8 | 81.4 |
+| Qwen3 1.7B, thinking off | CSQA | 68.3 | 61.8 | 21.5 | 0.0 | 0.0 | 68.1 | 68.1 |
+| Qwen3 1.7B, thinking on | GSM8K | 90.3 | 4.5 | 1.7 | 0.4 | running | 90.1 | 89.3 |
+| Qwen3 1.7B, thinking on | CSQA | 74.6 | 72.7 | 23.8 | 0.0 | running | 74.5 | 74.5 |
+| Llama 3.1 8B | GSM8K | 84.5 | 4.6 | 1.5 | 1.4 | 1.3 | 84.8 | 84.4 |
+| Llama 3.1 8B | CSQA | 70.8 | 63.9 | 21.3 | 0.0 | 0.0 | 70.9 | 70.8 |
+
+- Stock models cannot do GSM8K from braille even with 32k thinking tokens: Qwen scores 90.3 in print and 4.5 in Grade 1.
+- Grade 1 Braille ASCII reaches 90% to 97% of print accuracy on CommonsenseQA, so the models read uncontracted words. Grade 2 sits at 21% to 24% (chance is 20%). The Grade 1 GSM8K failure is then more likely about numbers than words.
+- The pipeline closes at least 98% of the GSM8K gap and at least 96% of the CommonsenseQA gap everywhere. The 8,192-token limit changes thinking-off results by at most 0.2 points.
+- Under noise the pipeline falls as before (Qwen GSM8K G1: 81.8, 61.9, 41.8, 21.3 at 0, 2, 5, 10%). At 10% flips the stock model on noisy Grade 1 ASCII CommonsenseQA is within 6 points of the pipeline (29.9 against 36.0).
+
+## Phase B gate B3: braille through a frozen model before training (2026-11-20)
+
+Qwen3 1.7B, frozen, no training. Mean NLL of the print sentence after "Braille: <input>\nPrint:", 200 dev sentences of `data/phaseB/dev.jsonl`. Output in `exp/phaseB/zero_shot/result.json`.
+
+| Input | Grade 1 | Grade 2 |
+|---|---|---|
+| Print copy (floor) | 0.27 | 0.27 |
+| Stock tokenizer, Braille ASCII | 0.82 | 2.72 |
+| Stock tokenizer, Unicode | 3.73 | 3.74 |
+| T1 cell, E1 / E2 | 6.88 / 3.12 | 6.67 / 3.59 |
+| T2 BPE 8k, E1 / E2 | 5.24 / 0.83 | 5.24 / 0.91 |
+| T3 rule units, E1 / E2 | 6.64 / 0.66 | 6.30 / 0.66 |
+
+Print-aligned initialization alone lets the frozen model read braille. Rule units with E2 lower the Grade 2 loss by 76% relative to the stock tokenizer on Braille ASCII and win on all 200 sentences; in Grade 1 they lower it by 20% and win on 142 of 200. E2 beats E1 for every tokenizer, by 54% to 90%. Cells gain least, because under the first-cell rule many cells have no print expansion (gate B2). B3 passes for both grades.

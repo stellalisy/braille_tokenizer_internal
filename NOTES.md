@@ -107,3 +107,7 @@ The instructions give a unit that a token cuts through to the token holding its 
 2. If B3 Grade 1 had failed against stock Braille ASCII, Grade 2 would decide. It did not come to that: Grade 1 passes (T3 with E2 0.655 against stock ASCII 0.821).
 
 With the gate met, Phase B GPU training is approved, thinking off. Debug runs first, then the T1/T2/T3 by E1/E2/E3 grid on Qwen3 1.7B, budget about 40 to 60 GPU-hours.
+
+## 2026-11-20. Gate B3 passes
+
+Grade 1 and Grade 2 both pass (RESULTS.md). All gates are met except A4, whose remaining runs are Qwen thinking on Unicode braille and cannot change A1 to A3. Phase B training starts.

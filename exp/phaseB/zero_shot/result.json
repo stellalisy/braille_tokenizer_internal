@@ -1,0 +1,100 @@
+{
+ "results": {
+  "print_copy": {
+   "nll": 0.2701,
+   "seconds": 63.9
+  },
+  "g1_stock_ascii": {
+   "nll": 0.8208,
+   "seconds": 65.7
+  },
+  "g1_stock_unicode": {
+   "nll": 3.7335,
+   "seconds": 159.2
+  },
+  "g1_t1_e2_fallback": 22,
+  "g1_t1_e1": {
+   "nll": 6.8796,
+   "seconds": 108.1
+  },
+  "g1_t1_e2": {
+   "nll": 3.1204,
+   "seconds": 108.0
+  },
+  "g1_t2_e2_fallback": 39,
+  "g1_t2_e1": {
+   "nll": 5.2378,
+   "seconds": 66.2
+  },
+  "g1_t2_e2": {
+   "nll": 0.8305,
+   "seconds": 66.4
+  },
+  "g1_t3_e2_fallback": 111,
+  "g1_t3_e1": {
+   "nll": 6.6384,
+   "seconds": 96.1
+  },
+  "g1_t3_e2": {
+   "nll": 0.655,
+   "seconds": 96.1
+  },
+  "g2_stock_ascii": {
+   "nll": 2.7218,
+   "seconds": 71.8
+  },
+  "g2_stock_unicode": {
+   "nll": 3.744,
+   "seconds": 134.2
+  },
+  "g2_t1_e2_fallback": 3,
+  "g2_t1_e1": {
+   "nll": 6.6731,
+   "seconds": 96.6
+  },
+  "g2_t1_e2": {
+   "nll": 3.5874,
+   "seconds": 96.5
+  },
+  "g2_t2_e2_fallback": 8,
+  "g2_t2_e1": {
+   "nll": 5.2435,
+   "seconds": 66.3
+  },
+  "g2_t2_e2": {
+   "nll": 0.9148,
+   "seconds": 66.4
+  },
+  "g2_t3_e2_fallback": 40,
+  "g2_t3_e1": {
+   "nll": 6.3011,
+   "seconds": 83.3
+  },
+  "g2_t3_e2": {
+   "nll": 0.6554,
+   "seconds": 83.3
+  }
+ },
+ "gate_b3": {
+  "g1": {
+   "e2_beats_e1_all": true,
+   "best_e2": "t3",
+   "best_e2_beats_stock_ascii": true,
+   "best_e2_wins_vs_stock_items": "142/200",
+   "pass": true
+  },
+  "g2": {
+   "e2_beats_e1_all": true,
+   "best_e2": "t3",
+   "best_e2_beats_stock_ascii": true,
+   "best_e2_wins_vs_stock_items": "200/200",
+   "pass": true
+  }
+ },
+ "n": 200,
+ "model": "Qwen/Qwen3-1.7B",
+ "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+ "base_hash": "5bdbbdd404647f079ba78896d63c7ddd1c59d5897767e9df7edaf3875658429c",
+ "command": "python scripts/phaseB_zero_shot.py --n 200 --threads 8 --out exp/phaseB/zero_shot",
+ "git_commit": "514e541a75f200c28f4c9957fac3b6b93d8076e6"
+}
