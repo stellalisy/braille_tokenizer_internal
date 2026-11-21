@@ -40,6 +40,10 @@ def main():
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--chunk", type=int, default=256)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--print-part", choices=["question", "choices"], default=None,
+                    help="diagnostic: give this part of the prompt in print, the rest in braille")
+    ap.add_argument("--qa-dev", default="data/phaseB/qa/dev.jsonl",
+                    help="items for condition qadev (held-out training questions, for selection)")
     a = ap.parse_args()
     out = a.out or f"{a.run}/eval"
     os.makedirs(out, exist_ok=True)
@@ -86,7 +90,12 @@ def main():
             p = chat(bb.make_braille_prompt(ds, r, bb.CONFIGS["EN-EN"], None))
             return base[tok(p, add_special_tokens=False)["input_ids"]], p
         ch = [Braille(c) for c in r.get("braille_choices", [])] if ds == "commonsenseqa" else []
-        segs = qa_segments(bb, ds, grade, Braille(r["braille_question"]), ch, chat=chat)
+        q = Braille(r["braille_question"])
+        if a.print_part == "question":
+            q = r["question"]
+        elif a.print_part == "choices" and ch:
+            ch = list(r["choices"])
+        segs = qa_segments(bb, ds, grade, q, ch, chat=chat)
         ex = build(segs, tok, btok)
         parts = [base[torch.tensor(ids)] if k == "t" else table[torch.tensor(ids)] for k, ids in ex.parts]
         shown = "".join(s if isinstance(s, str) else "[" + s.braille + "]" for s in segs)
@@ -98,14 +107,21 @@ def main():
         key = f"{ds}/{cond}"
         if key in results and a.limit is None:
             continue
-        if cond == "print":
+        if cond == "qadev":
+            recs = [json.loads(l) for l in open(a.qa_dev, encoding="utf8")]
+            recs = [dict(r, braille_question=r[f"g{grade}_question"], braille_choices=r.get(f"g{grade}_choices", []))
+                    for r in recs if r["ds"] == ds][: a.limit]
+        elif cond == "print":
             path = f"{a.inputs}/{ds}/print.jsonl"
         else:
             g, p = cond.split("_")
             assert int(g[1]) == grade, f"condition {cond} does not match grade {grade}"
             path = f"{a.inputs}/{ds}/{g}_unicode_{p}.jsonl"
-        recs = [json.loads(l) for l in open(path, encoding="utf8")][: a.limit]
-        if ds == "commonsenseqa":
+        if cond != "qadev":
+            recs = [json.loads(l) for l in open(path, encoding="utf8")][: a.limit]
+        if cond == "qadev":
+            base_choices = {i: r.get("choices") for i, r in enumerate(recs)}
+        elif ds == "commonsenseqa":
             base_choices = {i: json.loads(l)["choices"] for i, l in
                             enumerate(open(f"{a.inputs}/{ds}/print.jsonl", encoding="utf8"))}
         detail = f"{out}/{ds}_{cond}_details.jsonl"
