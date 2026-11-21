@@ -132,3 +132,7 @@ Phase B stage 1 decisions, fixed before the grid:
 ## 2026-11-21 Phase B stage 1 grid done; Checkpoint 2 met
 
 Training only the braille input closes 93% of the Grade 1 GSM8K gap (T3 E2, three seeds), well over the half-gap criterion, so Phase B continues (results in RESULTS.md). CommonsenseQA Grade 1 is the exception: trained inputs score below stock Braille ASCII. A diagnostic shows the loss is braille reading, about 7 points in the question and 7 in the choices; the prompt template costs nothing. Seeds were added for T3 E2 and T3 E3, chosen by accuracy on held-out training questions, not test. Next: the noise evaluation (p2, p5, p10) for the selected configurations, then stage 2 or the ablations in the outline.
+
+## 2026-11-21 Noise evaluation of stage 1
+
+Clean-trained learned inputs beat the pipeline on GSM8K from 5% flips upward and tie at 2%; the pipeline stays ahead on CommonsenseQA at every rate (RESULTS.md). E3 does not consistently beat E2 under noise. The next step the outline calls for is training with noisy braille; not started.

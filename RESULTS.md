@@ -174,3 +174,29 @@ CommonsenseQA accuracy (%, choice scoring); print 68.3, stock Braille ASCII 61.8
 - **Cost.** 3,000 steps take 17 to 25 minutes per run on one H200. Stage 1 so far (26 runs, their evaluations, debug runs, QA targets) used 10.5 GPU-hours (sacct, jobs named brl-phaseB).
 
 Runs: `exp/phaseB/train/g{grade}_{tok}_{emb}_s{seed}/` (`train_log.json`, `eval/result.json`, `eval_qadev/`, diagnostics in `eval_print_{question,choices,all}/`). Command: `bash scripts/phaseB_grid.sh <seed> "<grades>" "<toks>" "<embs>"`. Git commit and liblouis 3.32.0 are in each `train_log.json` and `eval/config.json`. Data: `data/phaseB/manifest.json` and `data/phaseB/qa/manifest.json`.
+
+## Phase B stage 1 under dot noise (clean-trained inputs)
+
+A learned input trained only on clean braille matches the pipeline at 2% flips and beats it on GSM8K from 5% upward, while starting 3 to 5 points lower on clean input. On CommonsenseQA the pipeline stays ahead at every rate. Items and noise are the Phase A ones (`data/phaseA/*/g*_unicode_p*.jsonl`); T3 rows are means over seeds 0 to 2 (standard deviation at most 1.6).
+
+| Dataset | Input | G1 0% | G1 2% | G1 5% | G1 10% | G2 0% | G2 2% | G2 5% | G2 10% |
+|---|---|---|---|---|---|---|---|---|---|
+| GSM8K | Stock, Braille ASCII | 3.4 | 3.3 | 2.8 | 2.4 | 1.4 | 1.4 | 1.4 | 2.0 |
+| GSM8K | Pipeline | 81.8 | 61.9 | 41.8 | 21.3 | 81.4 | 63.6 | 40.3 | 22.6 |
+| GSM8K | T3 + E2 | 77.2 | 61.0 | 43.2 | 24.3 | 77.8 | 63.2 | 42.5 | 24.7 |
+| GSM8K | T3 + E3 | 76.9 | 61.8 | 44.7 | 26.2 | 78.3 | 63.4 | 42.8 | 23.5 |
+| GSM8K | T1 + E1 (seed 0) | 75.3 | 58.0 | 39.3 | 20.6 | 75.7 | 60.5 | 39.3 | 21.5 |
+| GSM8K | T1 + E3 (seed 0) | 76.3 | 61.8 | 41.9 | 21.4 | 76.5 | 61.0 | 41.4 | 22.6 |
+| CSQA | Stock, Braille ASCII | 61.8 | 52.2 | 44.1 | 29.9 | 21.5 | 18.2 | 15.3 | 11.4 |
+| CSQA | Pipeline | 68.1 | 59.5 | 47.8 | 36.0 | 68.1 | 59.1 | 46.7 | 36.8 |
+| CSQA | T3 + E2 | 54.7 | 49.6 | 42.1 | 31.6 | 57.1 | 51.4 | 41.8 | 32.8 |
+| CSQA | T3 + E3 | 54.5 | 49.4 | 42.4 | 32.7 | 56.5 | 49.9 | 41.0 | 32.4 |
+| CSQA | T1 + E1 (seed 0) | 50.2 | 44.2 | 36.9 | 30.5 | 53.6 | 47.3 | 40.1 | 32.4 |
+| CSQA | T1 + E3 (seed 0) | 54.5 | 48.6 | 42.7 | 32.9 | 52.1 | 45.1 | 39.2 | 30.7 |
+
+- **GSM8K at 10% flips.** T3 E3 keeps 26.2 against 21.3 for the pipeline on Grade 1, a 23% relative gain. Both T3 configurations beat the pipeline at 5% and 10% in both grades.
+- **E3 versus E2.** Dot-composed init helps under noise only in Grade 1: +1.9 points at 10% on GSM8K there, -1.2 in Grade 2.
+- **E3 versus E1 with cells.** E3 beats E1 at every flip rate on GSM8K, by 0.5 to 3.8 points. It is also ahead on clean input, so these single-seed runs do not separate robustness from a better start.
+- **Next.** Training on noisy braille.
+
+Results are in `exp/phaseB/train/*/eval/result.json`. Command: `sbatch scripts/phaseB.sbatch eval --run <run> --conditions g<g>_p2,g<g>_p5,g<g>_p10`.
