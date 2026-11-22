@@ -12,6 +12,9 @@ the squared error between the student's hidden state at the last token of each b
 the frozen model's hidden state at the last token of the same print word (same prompt in print),
 divided by the squared norm of the latter, averaged over words and over the chosen layers.
 
+With --train-noise P, each training example (not dev) has dots flipped at a rate drawn from U[0, P],
+using the same flip_dots as the Phase A test noise.
+
 Checkpoints (trainable state, optimizer, schedule, RNG, step) are saved every --save-every steps,
 and a run restarts from its last checkpoint. The final embedding table goes to <out>/table.pt.
 
@@ -32,6 +35,7 @@ import torch.nn.functional as F
 
 from brltok.bridge import freeze, mean_init, param_hash, print_aligned_init
 from brltok.composed import ComposedEmbedding, token_features
+from brltok.noise import noisy_segments
 from brltok.splice import Braille, build, qa_segments
 from brltok.tokenizers import BrailleBPE, CellTokenizer, RuleUnitTokenizer
 
@@ -123,6 +127,8 @@ def main():
     ap.add_argument("--n-dev", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--grad-ckpt", action="store_true")
+    ap.add_argument("--train-noise", type=float, default=0.0,
+                    help="max dot-flip rate for training braille; each example draws its rate from U[0, max]")
     a = ap.parse_args()
     a.device = "cuda" if torch.cuda.is_available() else "cpu"
     layers = [int(x) for x in a.layers.split(",") if x]
@@ -161,11 +167,16 @@ def main():
     qa_dev = [json.loads(l) for l in open(f"{a.qa}/dev.jsonl", encoding="utf8")]
     qa_dev = [r for r in qa_dev if r["ds"] == "gsm8k"][:100] + [r for r in qa_dev if r["ds"] == "commonsenseqa"][:100]
 
-    def ex_tr(r):
-        return build([PREFIX, Braille(r[f"g{g}"], r["text"]), SUFFIX], tok, btok, " " + r["text"])
+    def ex_tr(r, rng=None):
+        segs = [PREFIX, Braille(r[f"g{g}"], r["text"]), SUFFIX]
+        if rng is not None:
+            segs = noisy_segments(segs, a.train_noise, rng)
+        return build(segs, tok, btok, " " + r["text"])
 
-    def ex_qa(r):
+    def ex_qa(r, rng=None):
         segs, tgt = qa_example(bb, chat, r, g, eos)
+        if rng is not None:
+            segs = noisy_segments(segs, a.train_noise, rng)
         ex = build(segs, tok, btok, tgt)
         ex.target = ex.target[: a.max_target]
         return ex
@@ -257,7 +268,9 @@ def main():
     t0, gpu_t0 = time.time(), time.time()
     n_qa = round(a.batch * a.qa_share)
     while step < a.steps:
-        batch = [ex_qa(r) for r in rng.sample(qa_tr, n_qa)] + [ex_tr(r) for r in rng.sample(tr, a.batch - n_qa)]
+        nz = rng if a.train_noise > 0 else None
+        batch = ([ex_qa(r, nz) for r in rng.sample(qa_tr, n_qa)]
+                 + [ex_tr(r, nz) for r in rng.sample(tr, a.batch - n_qa)])
         lm, dist, n_pairs = losses(batch)
         loss = lm + a.lam * dist
         opt.zero_grad(set_to_none=True)

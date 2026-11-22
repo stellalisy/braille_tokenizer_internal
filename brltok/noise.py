@@ -43,3 +43,17 @@ def insert_cells(braille: str, p: float, rng: random.Random, n_dots: int = 6) ->
         if ch != " " and rng.random() < p:
             out.append(cell(rng.randrange(1, 1 << n_dots)))
     return "".join(out)
+
+
+def noisy_segments(segments, p_max: float, rng: random.Random):
+    """Copy of splice segments with dots flipped in every braille span.
+
+    One flip rate per call, drawn uniformly from [0, p_max], is shared by all spans, so an example
+    is corrupted as a whole. Print segments and the print side of each span are left unchanged.
+    """
+    if p_max <= 0:
+        return list(segments)
+    from dataclasses import replace
+    p = rng.uniform(0, p_max)
+    return [replace(s, braille=flip_dots(s.braille, p, rng)) if hasattr(s, "braille") else s
+            for s in segments]
