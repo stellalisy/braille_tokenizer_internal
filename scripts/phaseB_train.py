@@ -12,6 +12,13 @@ the squared error between the student's hidden state at the last token of each b
 the frozen model's hidden state at the last token of the same print word (same prompt in print),
 divided by the squared norm of the latter, averaged over words and over the chosen layers.
 
+Two optional terms supervise what the word-level loss leaves free (off by default):
+  --tail-lam  the same normalized error at every prompt position after the last braille span (the
+              template up to the answer start, identical tokens in student and teacher), averaged
+              over --tail-layers; this is where the model combines the spans before answering.
+  --kl-lam    KL(teacher || student) on each target token, where the teacher reads the print prompt
+              followed by the same target; it matches the answer distribution, not one sample.
+
 With --train-noise P, each training example (not dev) has dots flipped at a rate drawn from U[0, P],
 using the same flip_dots as the Phase A test noise.
 
@@ -127,11 +134,15 @@ def main():
     ap.add_argument("--n-dev", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--grad-ckpt", action="store_true")
+    ap.add_argument("--tail-lam", type=float, default=0.0, help="weight of prompt-tail state distillation")
+    ap.add_argument("--tail-layers", default="2,4,6,8,10,12,14,16,18,20,22,24,26,28")
+    ap.add_argument("--kl-lam", type=float, default=0.0, help="weight of answer-distribution KL")
     ap.add_argument("--train-noise", type=float, default=0.0,
                     help="max dot-flip rate for training braille; each example draws its rate from U[0, max]")
     a = ap.parse_args()
     a.device = "cuda" if torch.cuda.is_available() else "cpu"
     layers = [int(x) for x in a.layers.split(",") if x]
+    tail_layers = [int(x) for x in a.tail_layers.split(",") if x]
     os.makedirs(a.out, exist_ok=True)
     random.seed(a.seed)
     torch.manual_seed(a.seed)
@@ -190,7 +201,18 @@ def main():
             xs.append(base(t) if kind == "t" else table[t].to(torch.bfloat16))
         return torch.cat(xs)
 
+    def tail_len(ex):
+        """Number of trailing prompt tokens identical in student and teacher (after the last span)."""
+        kind, ids = ex.parts[-1]
+        if kind != "t":
+            return 0
+        k = 0
+        while k < min(len(ids), len(ex.teacher)) and ids[-1 - k] == ex.teacher[-1 - k]:
+            k += 1
+        return k
+
     def losses(batch, train=True):
+        """Returns a dict of loss terms (tensors) and the number of word pairs."""
         table = emb.table()
         xs = [embed(ex, table) for ex in batch]
         T = max(x.shape[0] for x in xs)
@@ -199,34 +221,68 @@ def main():
         M = torch.zeros(len(xs), T, device=a.device, dtype=torch.long)
         for i, x in enumerate(xs):
             X[i, : x.shape[0]], M[i, : x.shape[0]] = x, 1
-        out = model(inputs_embeds=X, attention_mask=M, output_hidden_states=bool(layers and a.lam), use_cache=False)
+        use_dist = bool(layers and a.lam)
+        need_h = use_dist or bool(a.tail_lam and tail_layers)
+        out = model(inputs_embeds=X, attention_mask=M, output_hidden_states=need_h, use_cache=False)
         lm_num, lm_den = 0.0, 0
         for i, ex in enumerate(batch):
             P, n = ex.n_prompt, len(ex.target)
             logits = out.logits[i, P - 1: P - 1 + n].float()
             lm_num = lm_num + F.cross_entropy(logits, torch.tensor(ex.target, device=a.device), reduction="sum")
             lm_den += n
-        lm = lm_num / lm_den
-        dist = torch.zeros((), device=a.device)
+        res = {"lm": lm_num / lm_den}
+        zero = torch.zeros((), device=a.device)
+        res["dist"], res["tail"], res["kl"] = zero, zero, zero
         n_pairs = sum(len(ex.pairs) for ex in batch)
-        if layers and a.lam and n_pairs:
-            Tt = max(len(ex.teacher) for ex in batch)
-            ids = torch.full((len(batch), Tt), tok.pad_token_id or 0, device=a.device)
-            mt = torch.zeros_like(ids)
-            for i, ex in enumerate(batch):
-                ids[i, : len(ex.teacher)] = torch.tensor(ex.teacher, device=a.device)
-                mt[i, : len(ex.teacher)] = 1
-            with torch.no_grad():
-                th = model(input_ids=ids, attention_mask=mt, output_hidden_states=True, use_cache=False).hidden_states
+        if not (use_dist and n_pairs) and not a.tail_lam and not a.kl_lam:
+            return res, n_pairs
+        seqs = [ex.teacher + (ex.target if a.kl_lam else []) for ex in batch]
+        Tt = max(len(q) for q in seqs)
+        ids = torch.full((len(batch), Tt), tok.pad_token_id or 0, device=a.device)
+        mt = torch.zeros_like(ids)
+        for i, q in enumerate(seqs):
+            ids[i, : len(q)] = torch.tensor(q, device=a.device)
+            mt[i, : len(q)] = 1
+        with torch.no_grad():
+            tout = model(input_ids=ids, attention_mask=mt, output_hidden_states=need_h, use_cache=False)
+        th = tout.hidden_states
+        if use_dist and n_pairs:
             bi = torch.tensor([i for i, ex in enumerate(batch) for _ in ex.pairs], device=a.device)
             sp = torch.tensor([s for ex in batch for s, _ in ex.pairs], device=a.device)
             tp = torch.tensor([t for ex in batch for _, t in ex.pairs], device=a.device)
+            dist = zero
             for L in layers:
                 hs = out.hidden_states[L][bi, sp].float()
                 ht = th[L][bi, tp].float()
                 dist = dist + ((hs - ht).pow(2).sum(-1) / ht.pow(2).sum(-1).clamp(min=1e-6)).mean()
-            dist = dist / len(layers)
-        return lm, dist, n_pairs
+            res["dist"] = dist / len(layers)
+        if a.tail_lam and tail_layers:
+            bi, sp, tp = [], [], []
+            for i, ex in enumerate(batch):
+                k = tail_len(ex)
+                bi += [i] * k
+                sp += range(ex.n_prompt - k, ex.n_prompt)
+                tp += range(len(ex.teacher) - k, len(ex.teacher))
+            if bi:
+                bi, sp, tp = (torch.tensor(v, device=a.device) for v in (bi, sp, tp))
+                tail = zero
+                for L in tail_layers:
+                    hs = out.hidden_states[L][bi, sp].float()
+                    ht = th[L][bi, tp].float()
+                    tail = tail + ((hs - ht).pow(2).sum(-1) / ht.pow(2).sum(-1).clamp(min=1e-6)).mean()
+                res["tail"] = tail / len(tail_layers)
+        if a.kl_lam:
+            kl_num = zero
+            for i, ex in enumerate(batch):
+                P, n, Pt = ex.n_prompt, len(ex.target), len(ex.teacher)
+                ls = F.log_softmax(out.logits[i, P - 1: P - 1 + n].float(), -1)
+                lt = F.log_softmax(tout.logits[i, Pt - 1: Pt - 1 + n].float(), -1)
+                kl_num = kl_num + (lt.exp() * (lt - ls)).sum()
+            res["kl"] = kl_num / lm_den
+        return res, n_pairs
+
+    def total(res):
+        return res["lm"] + a.lam * res["dist"] + a.tail_lam * res["tail"] + a.kl_lam * res["kl"]
 
     params = [p for p in emb.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=a.lr, weight_decay=0.0)
@@ -253,11 +309,13 @@ def main():
     def evaluate():
         res = {}
         for name, rows, mk in (("dev_transcription", dev, ex_tr), ("dev_qa", qa_dev, ex_qa)):
-            lm_s, d_s, n = 0.0, 0.0, 0
+            acc, n = {}, 0
             for k in range(0, len(rows), 8):
-                lm, dist, _ = losses([mk(r) for r in rows[k: k + 8]], train=False)
-                lm_s, d_s, n = lm_s + lm.item(), d_s + dist.item(), n + 1
-            res[name] = {"lm": round(lm_s / n, 4), "dist": round(d_s / n, 4)}
+                r_, _ = losses([mk(r) for r in rows[k: k + 8]], train=False)
+                for key, v in r_.items():
+                    acc[key] = acc.get(key, 0.0) + v.item()
+                n += 1
+            res[name] = {key: round(v / n, 4) for key, v in acc.items()}
         return res
 
     rng = random.Random(a.seed * 1000 + step)
@@ -271,8 +329,9 @@ def main():
         nz = rng if a.train_noise > 0 else None
         batch = ([ex_qa(r, nz) for r in rng.sample(qa_tr, n_qa)]
                  + [ex_tr(r, nz) for r in rng.sample(tr, a.batch - n_qa)])
-        lm, dist, n_pairs = losses(batch)
-        loss = lm + a.lam * dist
+        res, n_pairs = losses(batch)
+        lm, dist = res["lm"], res["dist"]
+        loss = total(res)
         opt.zero_grad(set_to_none=True)
         loss.backward()
         gn = torch.nn.utils.clip_grad_norm_(params, 1.0).item()
@@ -280,11 +339,12 @@ def main():
         sched.step()
         step += 1
         if step % 25 == 0:
-            print(f"step {step} lm {lm.item():.4f} dist {dist.item():.4f} pairs {n_pairs} gn {gn:.3f} "
+            print(f"step {step} lm {lm.item():.4f} dist {dist.item():.4f} tail {res['tail'].item():.4f} "
+                  f"kl {res['kl'].item():.4f} pairs {n_pairs} gn {gn:.3f} "
                   f"lr {sched.get_last_lr()[0]:.2e} {time.time() - t0:.0f}s", flush=True)
         if step % a.eval_every == 0 or step == a.steps:
             r = evaluate()
-            history.append({"step": step, "train_lm": round(lm.item(), 4), "train_dist": round(dist.item(), 4), **r})
+            history.append({"step": step, **{f"train_{k}": round(v.item(), 4) for k, v in res.items()}, **r})
             print(f"step {step}", r, flush=True)
         if step % a.save_every == 0 or step == a.steps:
             torch.save({"emb": emb.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(),
