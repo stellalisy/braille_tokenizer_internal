@@ -136,3 +136,16 @@ Training only the braille input closes 93% of the Grade 1 GSM8K gap (T3 E2, thre
 ## 2026-11-21 Noise evaluation of stage 1
 
 Clean-trained learned inputs beat the pipeline on GSM8K from 5% flips upward and tie at 2%; the pipeline stays ahead on CommonsenseQA at every rate (RESULTS.md). E3 does not consistently beat E2 under noise. The next step the outline calls for is training with noisy braille; not started.
+
+## Diagnosing the Grade 1 CommonsenseQA loss (2026-11-22)
+
+Noisy-braille training (b5480ee) was started and cancelled within minutes: the CommonsenseQA loss may need a change to the training objective, which would invalidate those runs.
+
+The loss is in how the model combines braille words at the answer position, not in reading individual words. Measured on T3 E2 seed 0 (`scripts/phaseB_repsim.py`, 300 test items per dataset; `scripts/phaseB_transcribe.py`; label analysis on existing eval details):
+
+- Word-level hidden states are as close to print on CommonsenseQA as on GSM8K at every layer (cosine 0.90 vs 0.90 at layer 20, Grade 1).
+- The state at the last prompt position, where the answer is generated, is not. On GSM8K its cosine to print stays at 0.91 to 0.97 in every layer; on CommonsenseQA it falls to 0.55 at layer 18 (Grade 1; 0.53 in Grade 2) and recovers to 0.91 by layer 26.
+- Not the cause: word rarity in training text (accuracy flat across frequency bins), negation (same drop as print), choice labels (letter and text of an answer disagree in 4 of 947 responses; letter-only and text answers are equally wrong).
+- Questions transcribe exactly in 78% of items, and most of the rest differ by one word. Transcribing isolated choices is out of distribution (labels misread, words spelled out) and does not measure in-context reading.
+
+Training supervises only word-end states at layers 4, 8, 14 and the sampled answer text. Nothing supervises the template positions after the braille spans or the answer distribution, which is where the CommonsenseQA states diverge. Proposed fix: distill hidden states at those positions and the teacher answer distribution (KL on target tokens).
