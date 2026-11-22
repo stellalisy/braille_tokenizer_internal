@@ -1,7 +1,7 @@
 """Phase B evaluation: the frozen model reading braille through a trained input layer.
 
 Each item gets BrailleBench's braille-input prompt (G1-EN or G2-EN, Unicode note) in the chat
-template with thinking off; the question and choices are braille spans embedded with the trained
+template with thinking off (--thinking turns it on); the question and choices are braille spans embedded with the trained
 table, the rest is print embedded with the base model's own table. vLLM generates from these
 prompt embeddings with greedy decoding, and extraction and scoring are those of Phase A
 (scripts/phaseA_eval.py): BrailleBench extraction and math_verify for GSM8K, choice scoring for
@@ -38,6 +38,8 @@ def main():
     ap.add_argument("--max-tokens", type=int, default=8192)
     ap.add_argument("--max-model-len", type=int, default=10240)
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--thinking", action="store_true",
+                    help="Qwen3 thinking mode; use with --max-tokens 32768 --max-model-len 36864 as in Phase A")
     ap.add_argument("--chunk", type=int, default=256)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--print-part", choices=["question", "choices", "all"], default=None,
@@ -69,7 +71,7 @@ def main():
 
     def chat(p):
         return tok.apply_chat_template([{"role": "user", "content": p}], tokenize=False,
-                                       add_generation_prompt=True, enable_thinking=False)
+                                       add_generation_prompt=True, enable_thinking=a.thinking)
 
     if a.print_embeds:
         jobs = [(ds, "print") for ds in a.datasets.split(",")]
@@ -160,7 +162,7 @@ def main():
 
     json.dump({"command": "python " + " ".join(sys.argv), "run": a.run, "print_embeds": a.print_embeds,
                "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-               "model": a.model, "revision": a.revision, "thinking": False, "seed": a.seed,
+               "model": a.model, "revision": a.revision, "thinking": a.thinking, "seed": a.seed,
                "decoding": {"temperature": 0.0, "max_tokens": a.max_tokens}, "vllm": vllm.__version__,
                "slurm_job": os.environ.get("SLURM_JOB_ID")}, open(f"{out}/config.json", "w"), indent=1)
 
