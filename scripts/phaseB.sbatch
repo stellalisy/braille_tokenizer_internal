@@ -8,7 +8,7 @@
 #SBATCH --time=06:00:00
 #SBATCH -J brl-phaseB
 #SBATCH -o /gpfs/scrubbed/stelli/braille/logs/phaseB-%j.out
-# Phase B GPU jobs. Usage: sbatch scripts/phaseB.sbatch {train|eval|qa|transcribe|repsim} [script args]
+# Phase B GPU jobs. Usage: sbatch scripts/phaseB.sbatch {train|eval|qa|transcribe|repsim|choiceprobs} [script args]
 #   train -> scripts/phaseB_train.py (training venv)
 #   eval  -> scripts/phaseB_eval.py (vLLM venv)
 #   qa    -> scripts/phaseB_qa_targets.py generate (vLLM venv)
@@ -23,6 +23,8 @@ if [ "$MODE" = train ]; then
   python scripts/phaseB_train.py "$@"
 elif [ "$MODE" = repsim ]; then
   python scripts/phaseB_repsim.py "$@"
+elif [ "$MODE" = choiceprobs ]; then
+  python scripts/phaseB_choiceprobs.py "$@"
 else
   deactivate 2>/dev/null || true
   source "$BRL_SCRATCH/venv-vllm/bin/activate"
