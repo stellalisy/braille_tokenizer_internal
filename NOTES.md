@@ -189,3 +189,22 @@ The tail and KL terms stay in the code, off by default. Cost: about 5 GPU-hours.
 - Visible misreadings are concentrated in rare or compound words (tuckered as "tucked out", tomales as "tomalees", brainstem as "brains", bathhouse as "bathroom house"). Of 1,180 items whose print trace names all five options, the braille trace misses at least one in 247 (21%). Accuracy change against print: -10.8 when the gold option is misread (n=37), -5.7 when only others are (n=210), -3.6 when all five are read correctly (n=933). Most of the net loss is in items read correctly on the surface.
 
 Runs: `exp/phaseB/train/g{1,2}_t3_e2_s0/eval_thinking*`, `*/choiceprobs/`. Analysis: `scripts/analysis/phaseB_trace_options.py`, `scripts/analysis/phaseB_trace_flips.py` (run from the repo root).
+
+## Misreads by tokenizer and word type (2026-11-22)
+
+Rule units misread fewer options than cells but more than BPE, and every tokenizer misreads rare and multi-token words most. CommonsenseQA, E2 init, seed 0, thinking on; options counted only where the print-template trace names all five (`scripts/analysis/phaseB_tok_misreads.py`, `phaseB_misread_words.py`).
+
+| Grade | Tok | Accuracy (thinking) | Options misread | Items with a misread | Question transcribed exactly | Within one word |
+|---|---|---|---|---|---|---|
+| 1 | T1 cells | 66.8 | 6.3% | 24.7% | 77.5% | 92.0% |
+| 1 | T2 BPE | 68.6 | 3.5% | 14.2% | 35.1% | 50.0% |
+| 1 | T3 rule units | 70.0 | 5.2% | 20.9% | 78.6% | 89.8% |
+| 2 | T1 cells | 67.6 | 6.2% | 26.3% | 67.6% | 86.2% |
+| 2 | T2 BPE | 68.9 | 2.7% | 11.6% | 30.8% | 45.2% |
+| 2 | T3 rule units | 69.0 | 4.5% | 18.2% | 78.1% | 92.3% |
+
+Print with the same template scores 74.0 (G1) and 73.8 (G2). BPE restates short options best but transcribes full questions worst; whole-word units with print-aligned init carry common words well and break on the rest.
+
+By word type (G1 T3, 6,061 options): misread rate 44% for words unseen in training, 14% for 1 to 9 occurrences, 2 to 4% above 100; 4% for one-print-token words, 14% for two, 21% for three, 45% for four or more. Braille units per word matter little (3 to 7%). Grade 1 rule units are close to cells (no contractions), so segmentation cannot be what reduces misreads there.
+
+Conclusion: misreads come from the frozen model composing new vectors for words it rarely saw, not from segmentation. Design options under discussion: an encoder that reads each braille word into a distribution over the print vocabulary (recommended), rare-word training data, or print-isomorphic units.
