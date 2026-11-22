@@ -149,3 +149,21 @@ The loss is in how the model combines braille words at the answer position, not 
 - Questions transcribe exactly in 78% of items, and most of the rest differ by one word. Transcribing isolated choices is out of distribution (labels misread, words spelled out) and does not measure in-context reading.
 
 Training supervises only word-end states at layers 4, 8, 14 and the sampled answer text. Nothing supervises the template positions after the braille spans or the answer distribution, which is where the CommonsenseQA states diverge. Proposed fix: distill hidden states at those positions and the teacher answer distribution (KL on target tokens).
+
+## Answer-position distillation pilot: gap closed, accuracy unchanged (2026-11-22)
+
+Matching the answer-position states to print does not recover CommonsenseQA, so the divergence found there is a symptom, not the cause. Grade 1, T3 E2, seed 0, clean test sets (`--tail-lam`, `--kl-lam`, fa21e76):
+
+| Run | GSM8K | CSQA | CSQA last-position cosine, layers 8 to 28 (min) |
+|---|---|---|---|
+| baseline (g1_t3_e2_s0) | 77.3 | 54.0 | 0.56 |
+| tail 1 | 77.6 | 54.0 | 0.986 |
+| tail 1 + KL 1 | 76.9 | 51.4 | 0.982 |
+| tail 10 + KL 1 | 76.0 | 52.8 | 0.989 |
+
+- The tail term brings the CommonsenseQA last-position cosine from 0.56 to 0.98 or more at every layer, and accuracy does not move. Answer-distribution KL on the training QA does not help either (dev_qa KL 0.14 at the end).
+- Word-level states are unchanged by both terms (cosine about 0.91 at layer 20).
+- Held-out training questions agree with the test result (qadev CommonsenseQA 50.8 for the baseline), so this is not overfitting to the test split.
+- Remaining explanation: the answer is decided at answer tokens that attend back to the braille words, and word-level states (cosine about 0.90, normalized error about 0.3) are good enough for arithmetic but not for choosing among close options. Equal similarity on both datasets does not mean equal sensitivity to it.
+
+The tail and KL terms stay in the code, off by default. Cost: about 5 GPU-hours.
