@@ -167,3 +167,25 @@ Matching the answer-position states to print does not recover CommonsenseQA, so 
 - Remaining explanation: the answer is decided at answer tokens that attend back to the braille words, and word-level states (cosine about 0.90, normalized error about 0.3) are good enough for arithmetic but not for choosing among close options. Equal similarity on both datasets does not mean equal sensitivity to it.
 
 The tail and KL terms stay in the code, off by default. Cost: about 5 GPU-hours.
+
+## Option probabilities and thinking traces (2026-11-22)
+
+**Option probabilities (thinking off, `scripts/phaseB_choiceprobs.py`).** After "The answer is:", braille input leaves the model unsure rather than confidently wrong. Grade 1 T3 E2: mean top-option probability 0.65 against 0.98 in print; top option agrees with print on 63% of items, and on only 66% of the 1,048 items where print is over 99% sure. When braille disagrees, its pick is print's 2nd to 5th choice in 36/26/17/20% of cases. Grade 2 is similar (agreement 66%, confidence 0.72). The tail+KL pilot run is more confident (0.74) and agrees less (60%).
+
+**Thinking on, with the input trained thinking off** (`phaseB_eval.py --thinking`, 32,768 tokens, as Phase A):
+
+| Input | GSM8K | CSQA |
+|---|---|---|
+| Print, EN-EN prompt (Phase A) | 90.3 | 74.6 |
+| Print, braille-input template (`--print-part all`) | 90.2 | 74.0 |
+| Stock, Braille ASCII G1 / G2 (Phase A) | 4.5 / 1.7 | 72.7 / 23.8 |
+| Pipeline G1 (Phase A) | 90.1 | 74.5 |
+| T3 E2 seed 0, G1 | 87.3 | 70.0 |
+| T3 E2 seed 0, G2 | | 69.0 |
+
+- Thinking cuts the Grade 1 CommonsenseQA gap to print (same template) from 15.4 points to 4.0. GSM8K G1 closes 96.5% of its gap (93.0% thinking off). Grade 2 CommonsenseQA closes 89% (76% off). Grade 1 CommonsenseQA stays below stock Braille ASCII (72.7), whose gap is 1.9 points.
+- Traces restate the options in print: 94.3% of option texts appear verbatim in braille traces (99.3% in print traces). The likely mechanism is that thinking transcribes the braille into print tokens and the answer then attends to those. Not yet tested causally.
+- About half of the item changes are ordinary instability. Changing only the prompt wording in print flips 120 items (64 lost, 56 won); braille flips 218 (133 lost, 85 won).
+- Visible misreadings are concentrated in rare or compound words (tuckered as "tucked out", tomales as "tomalees", brainstem as "brains", bathhouse as "bathroom house"). Of 1,180 items whose print trace names all five options, the braille trace misses at least one in 247 (21%). Accuracy change against print: -10.8 when the gold option is misread (n=37), -5.7 when only others are (n=210), -3.6 when all five are read correctly (n=933). Most of the net loss is in items read correctly on the surface.
+
+Runs: `exp/phaseB/train/g{1,2}_t3_e2_s0/eval_thinking*`, `*/choiceprobs/`. Analysis: `scripts/analysis/phaseB_trace_options.py`, `scripts/analysis/phaseB_trace_flips.py` (run from the repo root).
