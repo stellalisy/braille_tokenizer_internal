@@ -308,3 +308,18 @@ Test-set words, encoder word accuracy (CommonsenseQA / GSM8K); liblouis strict i
 - The braille-side noise model is worth having: mix raises 10% OCR-noise accuracy by 6 to 7 points and real-photo accuracy from 25.5 to 33.3, the largest real-photo gain so far (liblouis 21.0).
 
 Decision: run local + nonw + mix from scratch (20,000 steps, Stage A settings; `exp/vocab/v2/g1_scratch_local_nonw_mix`, job 513670, eval 513671). Word-local and non-word data are both required by the design (no sentence context; copy any string). GPU time for this step: 4.1 h training, 1.0 h evaluation.
+
+## Revision 2: G1 local + non-word + mix from scratch (2026-11-23)
+
+Training from scratch gives the same model as the fine-tune, so word-local reading's cost on isolated typos is not left over from Stage A. Run `exp/vocab/v2/g1_scratch_local_nonw_mix` (20,000 steps, Stage A settings, seed 0, commit 6bb8965).
+
+| | Copy: real held-out | Copy: typos | Copy: random | Unseen clean (CSQA / GSM8K) | 10% flips | 10% OCR | Real photos G1 |
+|---|---|---|---|---|---|---|---|
+| fine-tune | 92.4 / 92.3 | 70.3 / 70.4 | 98.0 / 97.9 | 77.3 / 94.8 | 88.3 / 89.7 | 78.7 / 81.3 | 28.7 |
+| from scratch | 92.7 / 92.7 | 72.0 / 72.0 | 98.7 / 98.7 | 71.2 / 91.5 | 87.6 / 89.4 | 79.2 / 81.5 | 27.6 |
+
+- The remaining typo errors are almost all snaps to the intended word (criticioms as criticisms, analykze as analyze): 23% of typos snap, against 9% for the non-local nonw + mix run. The gold typo spelling keeps some probability (mean log prob -3.6 against -0.8 for the output).
+- Hypothesis: a one-letter typo and a one-cell corruption of a real word look identical within a word. The non-local reader can tell them apart by whether the rest of the sentence looks noisy; the word-local reader cannot, so it follows its training prior (noise on half the spans). This is irreducible ambiguity for a word-local reader, and the design hands it to the LLM through the soft output or n-best. Not yet tested.
+- Unseen-word accuracy differs by 6 and 3 points between fine-tune and scratch on n=66 and 153 words, within noise.
+
+Next: G2 from scratch with the same settings (job 514185, eval 514186), then the acceptance tests through the LLM. GPU time: 3.3 h training, 0.2 h evaluation.
