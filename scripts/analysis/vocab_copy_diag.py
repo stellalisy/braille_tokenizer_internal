@@ -29,6 +29,8 @@ def main():
     ap.add_argument("--run", required=True)
     ap.add_argument("--n", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--exclude", default=None, help="nonwords jsonl: never probe a string trained on")
+    ap.add_argument("--tag", default="", help="suffix of the output file name")
     ap.add_argument("--model", default="Qwen/Qwen3-1.7B")
     ap.add_argument("--revision", default="70d244cc86ccca08cf5af4e1e306ecf908b1ad5e")
     a = ap.parse_args()
@@ -55,7 +57,13 @@ def main():
         freq.update(ws)
     vocab_words = [json.loads(l)["text"] for l in open(f"data/vocab/words_g{g}.jsonl", encoding="utf8")]
     known.update(w.lower() for w in vocab_words)
-    common = [w for w, c in freq.most_common(20000) if len(w) >= 4 and w.isalpha() and w not in held]
+    avoid = set()
+    if a.exclude:
+        for line in open(a.exclude, encoding="utf8"):
+            avoid.update(w.lower() for w in json.loads(line)["text"].split())
+    # odd frequency ranks only: training typos (scripts/vocab_nonwords.py) use even ranks
+    ranked = [w for w, c in freq.most_common(20000) if len(w) >= 4 and w.isalpha()]
+    common = [w for w in ranked[1::2] if w not in held]
 
     def typo(w):
         for _ in range(50):
@@ -72,7 +80,7 @@ def main():
                 if i == len(w) - 1:
                     continue
                 t = w[:i] + w[i + 1] + w[i] + w[i + 2:]
-            if t != w and t not in known and len(t) >= 3:
+            if t != w and t not in known and t not in avoid and len(t) >= 3:
                 return t
         return None
 
@@ -89,7 +97,7 @@ def main():
     rd = []
     while len(rd) < a.n:
         t = "".join(chr(97 + rng.randrange(26)) for _ in range(rng.randint(4, 9)))
-        if t not in known:
+        if t not in known and t not in avoid:
             rd.append((t, None))
     sets["random"] = rd
 
@@ -200,7 +208,7 @@ def main():
             print(name, mode, report[f"{name}/{mode}"], flush=True)
             print("   ", "; ".join(examples[f"{name}/{mode}"]), flush=True)
     json.dump({"report": report, "examples": examples, "args": vars(a)},
-              open(f"{a.run}/copy_diag.json", "w"), indent=1)
+              open(f"{a.run}/copy_diag{a.tag}.json", "w"), indent=1)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,10 @@ model's vocabulary. The braille input to the model is, per predicted token,
     x = sum_v p(v) E[v]
 
 a convex mix of real token embeddings (soft), or E[argmax] (hard).
+
+With local=True (design note revision 2) the reader is word-local: encoder attention is masked so a
+cell attends only to cells of its own word, and positions count from the start of each word. The
+reading of a word then depends on its cells alone, never on the sentence around it.
 """
 from __future__ import annotations
 
@@ -50,9 +54,11 @@ def word_targets(base_tok, text: str) -> list[list[int]]:
 class VocabEncoder(nn.Module):
     def __init__(self, allowed_ids: torch.Tensor, emb: torch.Tensor, d: int = 512, enc_layers: int = 4,
                  dec_layers: int = 2, heads: int = 8, max_len: int = 4096, max_tokens: int = 24,
-                 dropout: float = 0.1):
+                 dropout: float = 0.1, local: bool = False):
         super().__init__()
         V, D = emb.shape
+        self.local = local
+        self.heads = heads
         self.max_tokens = max_tokens
         self.register_buffer("allowed", allowed_ids.long().clone())
         to_idx = torch.full((V,), -1, dtype=torch.long)
@@ -92,8 +98,36 @@ class VocabEncoder(nn.Module):
                 pad[i, : len(x)] = False
         bits = ((X.clamp(max=63).unsqueeze(-1) >> torch.arange(6, device=dev)) & 1).float()
         bits = bits * (X < 64).unsqueeze(-1)
-        h = self.cell(X) + self.dots(bits) + self.pos(torch.arange(L, device=dev))[None]
-        h = self.enc(h, src_key_padding_mask=pad)
+        if not self.local:
+            h = self.cell(X) + self.dots(bits) + self.pos(torch.arange(L, device=dev))[None]
+            h = self.enc(h, src_key_padding_mask=pad)
+            return self.enc_norm(h)
+        # word-local: group id per position (each blank or pad cell is its own group), offset in word
+        grp = torch.zeros((len(ids), L), dtype=torch.long, device=dev)
+        off = torch.zeros((len(ids), L), dtype=torch.long, device=dev)
+        for i, x in enumerate(ids):
+            g, o, prev_blank = 0, 0, True
+            gl, ol = [], []
+            for c in x + [SPACE] * (L - len(x)):
+                if c == SPACE:
+                    g += 1
+                    gl.append(g)
+                    ol.append(0)
+                    g += 1
+                    prev_blank = True
+                else:
+                    if prev_blank:
+                        o = 0
+                    gl.append(g)
+                    ol.append(o)
+                    o += 1
+                    prev_blank = False
+            grp[i] = torch.tensor(gl, device=dev)
+            off[i] = torch.tensor(ol, device=dev)
+        h = self.cell(X) + self.dots(bits) + self.pos(off)
+        block = grp[:, :, None] != grp[:, None, :]                      # True = may not attend
+        block = block.repeat_interleave(self.heads, 0)
+        h = self.enc(h, mask=block)
         return self.enc_norm(h)
 
     def word_memory(self, H, spans: list[str]):

@@ -9,6 +9,12 @@ A seeded 2% of the word list, restricted to words absent from the training sente
 as unseen dev words (saved to <out>/heldout_words.json). Checkpoints every --save-every steps; a run
 resumes from <out>/ckpt.pt. Final model: <out>/encoder.pt.
 
+Revision 2 options (docs/design_print_vocab_encoder.md): --local makes the reader word-local;
+--nonwords mixes non-word items (scripts/vocab_nonwords.py) into a --nonword-share of both the
+sentence and the word batch; --noise-profile picks the corruption (flip: dot flips as before; writing,
+ocr: brltok.noise.braille_noise profiles; mix: one of the three per span); --init starts from the
+weights of an earlier run (fine-tuning) when <out> has no checkpoint.
+
     python scripts/vocab_train_a.py --grade 1 --out exp/vocab/g1_a_s0
 """
 import argparse
@@ -48,6 +54,12 @@ def main():
     ap.add_argument("--eval-every", type=int, default=1000)
     ap.add_argument("--save-every", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--local", action="store_true")
+    ap.add_argument("--nonwords", default=None)
+    ap.add_argument("--nonword-share", type=float, default=0.3)
+    ap.add_argument("--noise-profile", choices=["flip", "writing", "ocr", "mix"], default="flip")
+    ap.add_argument("--init", default=None, help="encoder.pt or ckpt.pt to start from")
+    ap.add_argument("--heldout-from", default=None, help="reuse the held-out word list of this run")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     random.seed(a.seed)
@@ -56,7 +68,7 @@ def main():
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     from brltok.cells import normalize
-    from brltok.noise import flip_dots
+    from brltok.noise import braille_noise, flip_dots
     from brltok.vocab_encoder import VocabEncoder, span_words, word_targets
 
     tok = AutoTokenizer.from_pretrained(a.model, revision=a.revision)
@@ -85,12 +97,22 @@ def main():
     words = [json.loads(l) for l in open(f"{a.vocab}/words_g{g}.jsonl", encoding="utf8")]
     rng = random.Random(a.seed)
     held = {w["text"].lower() for w in words if w["text"].lower() not in corpus and rng.random() < 0.02}
+    if a.heldout_from:
+        held = set(json.load(open(f"{a.heldout_from}/heldout_words.json")))
     wtr = [(normalize(w["braille"]), w["text"]) for w in words if w["text"].lower() not in held]
     wdv = [(normalize(w["braille"]), w["text"]) for w in words if w["text"].lower() in held][:2000]
     json.dump(sorted(held), open(f"{a.out}/heldout_words.json", "w"))
     print(f"sentences {len(tr)} dev {len(dv)}; words {len(wtr)} held-out {len(wdv)}", flush=True)
 
     config = dict(d=a.d, enc_layers=a.enc_layers, dec_layers=a.dec_layers)
+    if a.local:
+        config["local"] = True
+    nw_sent, nw_word = [], []
+    if a.nonwords:
+        for line in open(a.nonwords, encoding="utf8"):
+            r = json.loads(line)
+            (nw_sent if r["kind"].startswith("sent") else nw_word).append((normalize(r["braille"]), r["text"]))
+        print(f"non-word items: {len(nw_sent)} sentences, {len(nw_word)} words", flush=True)
     enc = VocabEncoder(allowed, emb, **config).to(dev)
     n_params = sum(p.numel() for p in enc.parameters())
     opt = torch.optim.AdamW(enc.parameters(), lr=a.lr, weight_decay=0.01)
@@ -110,11 +132,17 @@ def main():
         sched.load_state_dict(st["sched"])
         step, history = st["step"], st["history"]
         print(f"resumed at step {step}", flush=True)
+    elif a.init:
+        st = torch.load(a.init, map_location=dev, weights_only=False)
+        missing, unexpected = enc.load_state_dict(st["model"], strict=False)
+        print(f"initialized from {a.init} (missing {len(missing)}, unexpected {len(unexpected)})", flush=True)
 
     def noisy(b, r):
-        if r.random() < a.noise_share:
-            return flip_dots(b, r.uniform(0, a.noise), r)
-        return b
+        if r.random() >= a.noise_share:
+            return b
+        prof = a.noise_profile if a.noise_profile != "mix" else r.choice(["flip", "writing", "ocr"])
+        rate = r.uniform(0, a.noise)
+        return flip_dots(b, rate, r) if prof == "flip" else braille_noise(b, rate, r, prof)
 
     def batch_loss(pairs, r=None):
         spans = [noisy(b, r) if r else b for b, _ in pairs]
@@ -147,7 +175,12 @@ def main():
     if step == 0:
         history.append({"step": 0, **evaluate()})
     while step < a.steps:
-        pairs = rng.sample(tr, a.sent_batch) + rng.sample(wtr, a.word_batch)
+        if a.nonwords:
+            ns, nw = round(a.sent_batch * a.nonword_share), round(a.word_batch * a.nonword_share)
+            pairs = (rng.sample(tr, a.sent_batch - ns) + rng.sample(nw_sent, ns)
+                     + rng.sample(wtr, a.word_batch - nw) + rng.sample(nw_word, nw))
+        else:
+            pairs = rng.sample(tr, a.sent_batch) + rng.sample(wtr, a.word_batch)
         loss, acc = batch_loss(pairs, rng)
         opt.zero_grad(set_to_none=True)
         loss.backward()

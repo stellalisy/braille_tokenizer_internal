@@ -82,3 +82,17 @@ def test_build_vocab_without_print():
     tok = FakeTok()
     ex = build_vocab(["Q: ", Braille("⠁⠃ ⠉"), " end"], tok)
     assert ex.span_ids == [None] and ex.pairs == []
+
+
+def test_local_reader_ignores_context():
+    torch.manual_seed(0)
+    emb = torch.randn(50, 16)
+    enc = VocabEncoder(torch.arange(40), emb, d=32, enc_layers=2, dec_layers=1, heads=2, max_len=64,
+                       max_tokens=8, dropout=0.0, local=True).eval()
+    # the states of word "⠁⠃" are identical whatever surrounds it and wherever it sits
+    a = enc.encode(["⠁⠃"])[0, :2]
+    b = enc.encode(["⠉⠙⠑ ⠁⠃ ⠋"])[0, 4:6]
+    assert torch.allclose(a, b, atol=1e-5)
+    glob = VocabEncoder(torch.arange(40), emb, d=32, enc_layers=2, dec_layers=1, heads=2, max_len=64,
+                        max_tokens=8, dropout=0.0, local=False).eval()
+    assert not torch.allclose(glob.encode(["⠁⠃"])[0, :2], glob.encode(["⠉⠙⠑ ⠁⠃ ⠋"])[0, 4:6], atol=1e-3)
