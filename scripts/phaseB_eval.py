@@ -38,6 +38,9 @@ def main():
     ap.add_argument("--max-tokens", type=int, default=8192)
     ap.add_argument("--max-model-len", type=int, default=10240)
     ap.add_argument("--limit", type=int, default=None)
+    ap.add_argument("--encoder", default=None,
+                    help="print-vocabulary encoder checkpoint (brltok.vocab_encoder); --run then names its run dir")
+    ap.add_argument("--hard", action="store_true", help="with --encoder: argmax token embeddings instead of soft mixes")
     ap.add_argument("--thinking", action="store_true",
                     help="Qwen3 thinking mode; use with --max-tokens 32768 --max-model-len 36864 as in Phase A")
     ap.add_argument("--chunk", type=int, default=256)
@@ -64,8 +67,12 @@ def main():
     hf = AutoModelForCausalLM.from_pretrained(a.model, revision=a.revision, torch_dtype=torch.bfloat16)
     base = hf.get_input_embeddings().weight.detach().clone()
     del hf
+    if a.encoder:
+        from brltok.vocab_encoder import build_vocab, load_encoder
+        enc = load_encoder(a.encoder, base.float(), device="cuda")
+        base_bf = base
     llm = LLM(model=a.model, revision=a.revision, dtype="bfloat16", seed=a.seed, max_model_len=a.max_model_len,
-              enable_prompt_embeds=True, gpu_memory_utilization=0.85)
+              enable_prompt_embeds=True, gpu_memory_utilization=0.80 if a.encoder else 0.85)
     tok = llm.get_tokenizer()
     sp = SamplingParams(temperature=0.0, max_tokens=a.max_tokens, seed=a.seed)
 
@@ -77,6 +84,11 @@ def main():
         jobs = [(ds, "print") for ds in a.datasets.split(",")]
         table = btok = None
         grade = None
+    elif a.encoder:
+        log = json.load(open(f"{a.run}/train_log.json"))
+        grade = log["args"]["grade"]
+        table = btok = None
+        jobs = [(ds, c) for ds in a.datasets.split(",") for c in a.conditions.split(",")]
     else:
         log = json.load(open(f"{a.run}/train_log.json"))
         grade, tname = log["args"]["grade"], log["args"]["tok"]
@@ -98,6 +110,12 @@ def main():
         if a.print_part in ("choices", "all") and ch:
             ch = list(r["choices"])
         segs = qa_segments(bb, ds, grade, q, ch, chat=chat)
+        shown = "".join(s if isinstance(s, str) else "[" + s.braille + "]" for s in segs)
+        if a.encoder:
+            vx = build_vocab(segs, tok)
+            dec = enc.decode(vx.spans, hard=a.hard) if vx.spans else []
+            parts = [base_bf[torch.tensor(v)] if k == "t" else dec[v][0].to("cpu", torch.bfloat16) for k, v in vx.parts]
+            return torch.cat(parts), shown
         ex = build(segs, tok, btok)
         parts = [base[torch.tensor(ids)] if k == "t" else table[torch.tensor(ids)] for k, ids in ex.parts]
         shown = "".join(s if isinstance(s, str) else "[" + s.braille + "]" for s in segs)
@@ -162,6 +180,7 @@ def main():
 
     json.dump({"command": "python " + " ".join(sys.argv), "run": a.run, "print_embeds": a.print_embeds,
                "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+               "encoder": a.encoder, "hard": a.hard,
                "model": a.model, "revision": a.revision, "thinking": a.thinking, "seed": a.seed,
                "decoding": {"temperature": 0.0, "max_tokens": a.max_tokens}, "vllm": vllm.__version__,
                "slurm_job": os.environ.get("SLURM_JOB_ID")}, open(f"{out}/config.json", "w"), indent=1)

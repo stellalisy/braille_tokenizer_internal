@@ -8,12 +8,13 @@
 #SBATCH --time=06:00:00
 #SBATCH -J brl-phaseB
 #SBATCH -o /gpfs/scrubbed/stelli/braille/logs/phaseB-%j.out
-# Phase B GPU jobs. Usage: sbatch scripts/phaseB.sbatch {train|eval|qa|transcribe|repsim|choiceprobs} [script args]
+# Phase B GPU jobs. Usage: sbatch scripts/phaseB.sbatch {train|eval|qa|transcribe|repsim|choiceprobs|py} [script args]
 #   train -> scripts/phaseB_train.py (training venv)
 #   eval  -> scripts/phaseB_eval.py (vLLM venv)
 #   qa    -> scripts/phaseB_qa_targets.py generate (vLLM venv)
 #   transcribe -> scripts/phaseB_transcribe.py (vLLM venv)
 #   repsim -> scripts/phaseB_repsim.py (training venv)
+#   py <script> [args] -> any script in the training venv
 set -euo pipefail
 source /gpfs/projects/stf/stelli/braille_tokenizer_internal/scripts/env.sh
 cd /gpfs/projects/stf/stelli/braille_tokenizer_internal
@@ -23,6 +24,8 @@ if [ "$MODE" = train ]; then
   python scripts/phaseB_train.py "$@"
 elif [ "$MODE" = repsim ]; then
   python scripts/phaseB_repsim.py "$@"
+elif [ "$MODE" = py ]; then
+  python "$@"
 elif [ "$MODE" = choiceprobs ]; then
   python scripts/phaseB_choiceprobs.py "$@"
 else

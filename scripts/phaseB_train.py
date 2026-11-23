@@ -25,6 +25,11 @@ using the same flip_dots as the Phase A test noise.
 Checkpoints (trainable state, optimizer, schedule, RNG, step) are saved every --save-every steps,
 and a run restarts from its last checkpoint. The final embedding table goes to <out>/table.pt.
 
+With --emb vocab the braille input is the print-vocabulary encoder (brltok.vocab_encoder), initialized
+from a Stage A checkpoint (--encoder-init) and trained through the frozen model (Stage B). Spans with a
+word-aligned print form are teacher-forced on their gold print tokens; Stage A's cross-entropy stays on
+with weight --ce-lam. The final encoder goes to <out>/encoder.pt.
+
     python scripts/phaseB_train.py --grade 1 --tok t3 --emb e2 --out exp/phaseB/train/g1_t3_e2_s0
 """
 import argparse
@@ -112,7 +117,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--grade", type=int, required=True)
     ap.add_argument("--tok", choices=["t1", "t2", "t3"], required=True)
-    ap.add_argument("--emb", choices=["e1", "e2", "e3"], required=True)
+    ap.add_argument("--emb", choices=["e1", "e2", "e3", "vocab"], required=True)
+    ap.add_argument("--encoder-init", default=None, help="with --emb vocab: Stage A encoder.pt")
+    ap.add_argument("--ce-lam", type=float, default=1.0, help="with --emb vocab: weight of Stage A cross-entropy")
+    ap.add_argument("--hard", action="store_true", help="with --emb vocab: argmax embeddings (ablation)")
     ap.add_argument("--out", required=True)
     ap.add_argument("--data", default="data/phaseB")
     ap.add_argument("--qa", default="data/phaseB/qa")
@@ -161,7 +169,15 @@ def main():
     base_emb = base.weight.detach().float().cpu()
     btok = load_tok(a.data, a.grade, a.tok)
     log = {"args": {k: v for k, v in vars(a).items()}, "base_hash": h0}
-    emb = make_embedding(a, btok, tok, base_emb, log).to(a.device)
+    vocab = a.emb == "vocab"
+    if vocab:
+        from brltok.vocab_encoder import build_vocab, load_encoder
+        assert a.encoder_init, "--emb vocab needs --encoder-init"
+        emb = load_encoder(a.encoder_init, base_emb, device=a.device)
+        emb.config = torch.load(a.encoder_init, map_location="cpu", weights_only=False)["config"]
+        emb.train()
+    else:
+        emb = make_embedding(a, btok, tok, base_emb, log).to(a.device)
     n_params = sum(p.numel() for p in emb.parameters() if p.requires_grad)
     log["trainable_params"] = n_params
 
@@ -182,17 +198,45 @@ def main():
         segs = [PREFIX, Braille(r[f"g{g}"], r["text"]), SUFFIX]
         if rng is not None:
             segs = noisy_segments(segs, a.train_noise, rng)
+        if vocab:
+            return build_vocab(segs, tok, " " + r["text"])
         return build(segs, tok, btok, " " + r["text"])
 
     def ex_qa(r, rng=None):
         segs, tgt = qa_example(bb, chat, r, g, eos)
         if rng is not None:
             segs = noisy_segments(segs, a.train_noise, rng)
-        ex = build(segs, tok, btok, tgt)
+        ex = build_vocab(segs, tok, tgt) if vocab else build(segs, tok, btok, tgt)
         ex.target = ex.target[: a.max_target]
         return ex
 
+    def embed_vocab(ex):
+        """Encoder vectors for every span (teacher-forced on gold tokens, else on its own greedy reading)."""
+        ids = []
+        for k, sp in enumerate(ex.spans):
+            if ex.span_ids[k] is not None:
+                ids.append(ex.span_ids[k])
+            else:
+                emb.eval()
+                _, pred, _, lens = emb.decode([sp])[0]
+                emb.train()
+                w, c = [], 0
+                for n in lens:
+                    w.append(pred[c: c + n])
+                    c += n
+                ids.append(w)
+        vecs = emb.forced_embeddings(ex.spans, [w for x in ids for w in x], hard=a.hard) if ex.spans else []
+        xs = []
+        for kind, v in ex.parts:
+            xs.append(base(torch.tensor(v, device=a.device)) if kind == "t" else vecs[v].to(torch.bfloat16))
+        ex.n_prompt = sum(x.shape[0] for x in xs)
+        if ex.target:
+            xs.append(base(torch.tensor(ex.target, device=a.device)))
+        return torch.cat(xs)
+
     def embed(ex, table):
+        if vocab:
+            return embed_vocab(ex)
         xs = []
         for kind, ids in ex.parts + [("t", ex.target)]:
             if not ids:
@@ -213,7 +257,7 @@ def main():
 
     def losses(batch, train=True):
         """Returns a dict of loss terms (tensors) and the number of word pairs."""
-        table = emb.table()
+        table = None if vocab else emb.table()
         xs = [embed(ex, table) for ex in batch]
         T = max(x.shape[0] for x in xs)
         d = xs[0].shape[1]
@@ -232,7 +276,13 @@ def main():
             lm_den += n
         res = {"lm": lm_num / lm_den}
         zero = torch.zeros((), device=a.device)
-        res["dist"], res["tail"], res["kl"] = zero, zero, zero
+        res["dist"], res["tail"], res["kl"], res["ce"] = zero, zero, zero, zero
+        if vocab and a.ce_lam:
+            sp = [s for ex in batch for s, gi in zip(ex.spans, ex.span_ids) if gi is not None]
+            wi = [w for ex in batch for gi in ex.span_ids if gi is not None for w in gi]
+            if sp:
+                with torch.autocast("cuda", dtype=torch.bfloat16):
+                    res["ce"], _ = emb.loss(sp, wi, 0.05)
         n_pairs = sum(len(ex.pairs) for ex in batch)
         if not (use_dist and n_pairs) and not a.tail_lam and not a.kl_lam:
             return res, n_pairs
@@ -282,7 +332,8 @@ def main():
         return res, n_pairs
 
     def total(res):
-        return res["lm"] + a.lam * res["dist"] + a.tail_lam * res["tail"] + a.kl_lam * res["kl"]
+        return (res["lm"] + a.lam * res["dist"] + a.tail_lam * res["tail"] + a.kl_lam * res["kl"]
+                + a.ce_lam * res["ce"] * vocab)
 
     params = [p for p in emb.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=a.lr, weight_decay=0.0)
@@ -354,7 +405,11 @@ def main():
             rng = random.Random(a.seed * 1000 + step)   # resume draws the same batches as a run that never stopped
 
     with torch.no_grad():
-        torch.save(emb.table().detach().float().cpu(), f"{a.out}/table.pt")
+        if vocab:
+            torch.save({"model": emb.state_dict(), "allowed": emb.allowed.tolist(), "config": emb.config},
+                       f"{a.out}/encoder.pt")
+        else:
+            torch.save(emb.table().detach().float().cpu(), f"{a.out}/table.pt")
     h1 = param_hash(model)
     assert h1 == h0, "base model changed"
     log.update(history=history, base_hash_end=h1, base_unchanged=True, steps=step,
