@@ -223,7 +223,7 @@ Real-image setup:
 - Detector: DotNeuralNet YOLOv8-m (snoop2head/yolov8m-braille, sha256 aeb1fe31...), trained on Angelina, DSBI and natural-scene photos. The original Angelina Reader weights URL is dead. Pickle imports checked before loading (torch and ultralytics classes only). Runs in a separate venv (venv-obr: ultralytics 8.0.58, torch 2.1.2). Lines and spaces from box geometry with fixed rules (`scripts/realimg/obr_detect.py`).
 - Scoring: `scripts/realimg/realimg_score.py`; word accuracy from a word alignment against the label, after lowercasing and stripping punctuation.
 
-Interim result (G1 Stage A ckpt step 19000, G2 final):
+Result (final Stage A encoders; identical to the interim step-19000 G1 score):
 
 | Cell error of detected cells vs liblouis forward of label | Images | Label words | Encoder | liblouis |
 |---|---|---|---|---|
@@ -238,3 +238,16 @@ On the liblouis forward translation of the same labels: encoder 98.6, liblouis 1
 - The detector is the bottleneck: half the images have 50% or more cell error, where neither reader recovers much.
 - Real recognition noise is not dot flips. Of the cell edits, about 1,144 are insertions (often a repeated cell, e.g. ⠁⠁⠁), 417 deletions, 1,521 unequal-length replacements, 362 multi-dot substitutions, 42 one-dot substitutions and 44 space errors. Our training noise (uniform dot flips) covers almost none of this, yet the encoder still beats liblouis in every bucket.
 - These 401 images are the test set. Any noise model must be estimated elsewhere (candidate: detector output vs gold cell labels on the Angelina dataset, which has per-cell labels).
+
+## Stage A final word-level results (2026-11-22)
+
+Greedy word exact match on Phase A test spans (`scripts/vocab_eval_words.py`, runs `exp/vocab/g{1,2}_a_s0`, 20,000 steps each). Encoder vs liblouis back-translation on the same braille; "unseen" is words absent from the training corpus and word list (CommonsenseQA n=66, GSM8K n=153).
+
+| Grade | Dataset | Clean enc / liblouis | 2% flips | 5% flips | 10% flips | Unseen, clean |
+|---|---|---|---|---|---|---|
+| 1 | CommonsenseQA | 99.67 / 100.0 | 98.33 / 90.88 | 96.25 / 78.89 | 92.51 / 62.29 | 63.6 |
+| 1 | GSM8K | 98.15 / 98.88 | 97.07 / 90.58 | 95.68 / 79.67 | 93.18 / 63.95 | 83.7 |
+| 2 | CommonsenseQA | 99.50 / 99.98 | 97.83 / 92.46 | 94.98 / 82.10 | 90.42 / 67.73 | 57.6 |
+| 2 | GSM8K | 98.25 / 98.87 | 96.95 / 92.41 | 94.93 / 83.49 | 91.50 / 70.76 | 81.1 |
+
+The real-image scores above are unchanged with the final G1 encoder (`exp/realimg/score_v1.json`): 26.0 vs 21.8 overall. Stage A GPU time: about 2 x 3.2 h.
