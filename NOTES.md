@@ -272,3 +272,39 @@ Copy probe (`scripts/analysis/vocab_copy_diag.py`, 1,000 items per set, clean li
 Cause: Stage A training is solvable by word recognition. Every target is a real word (150k word list plus corpus sentences), so the model never needs to copy letters, and in real sentences context always agrees with the cells, so using context is a free shortcut. The design assumed subword outputs would let unseen words be composed; that holds for well-formed rare words read alone (95%) but not for non-words or in context.
 
 Tension: the same lexical and contextual prior is likely what makes the encoder robust to dot flips (90 to 93% at 10% vs liblouis 62 to 71%). A string that is not a word is either a noisy word or a real non-word; the reader can only tell by how noisy the input looks. The soft output can carry that ambiguity to the model if the reader is calibrated.
+
+## Revision 2, step 1: G1 fine-tune ablation (2026-11-23)
+
+Non-word training data is what makes the reader copy. Word-local reading removes the context effect entirely. The new noise model helps on real photos. All five runs are 5,000-step fine-tunes of `exp/vocab/g1_a_s0` (lr 2e-4, warmup 200, seed 0, same held-out words), commit f33dddb, liblouis and data as in Stage A. Runs in `exp/vocab/v2/g1_<name>`, evaluated by `scripts/vocab_eval_suite.py`. "mix" draws dot flips, the writing profile or the measured OCR profile per span; "nonw" replaces 30% of each batch with non-word items (`data/vocab/nonwords_g1.jsonl`); "local" blocks attention across words.
+
+Copy probe (fresh items, none in the non-word training data; exact copy, isolated / in a sentence):
+
+| Run | Real held-out | Typos | Random strings |
+|---|---|---|---|
+| Stage A | 94.9 / 67.9 | 51.7 / 27.7 | 25.6 / 11.8 |
+| ctrl (flips) | 94.9 / 69.5 | 49.7 / 28.0 | 24.4 / 11.6 |
+| mix | 94.6 / 67.3 | 48.2 / 23.9 | 30.4 / 10.5 |
+| local + mix | 89.4 / 89.3 | 38.1 / 38.5 | 25.8 / 25.9 |
+| nonw + mix | 98.0 / 84.3 | 87.8 / 63.1 | 99.2 / 97.0 |
+| local + nonw + mix | 92.4 / 92.3 | 70.3 / 70.4 | 98.0 / 97.9 |
+
+Test-set words, encoder word accuracy (CommonsenseQA / GSM8K); liblouis strict in the last row:
+
+| Run | Clean | Unseen, clean | 10% flips | 10% writing | 10% OCR | Real photos G1 (732 words) |
+|---|---|---|---|---|---|---|
+| Stage A | 99.67 / 98.15 | 63.6 / 83.7 | 92.5 / 93.2 | 86.5 / 87.5 | 76.0 / 79.0 | 25.5 |
+| ctrl | 99.70 / 98.24 | 63.6 / 85.0 | 92.7 / 93.5 | 86.5 / 87.8 | 76.1 / 79.1 | 25.7 |
+| mix | 99.53 / 98.26 | 59.1 / 82.4 | 91.7 / 92.5 | 89.8 / 90.8 | 82.4 / 85.8 | 33.3 |
+| local + mix | 99.79 / 98.78 | 63.6 / 90.8 | 90.4 / 91.0 | 88.6 / 89.0 | 81.0 / 82.8 | 31.4 |
+| nonw + mix | 99.74 / 98.24 | 72.7 / 84.3 | 89.3 / 92.2 | 87.5 / 90.4 | 80.0 / 85.1 | 29.5 |
+| local + nonw + mix | 99.79 / 98.79 | 77.3 / 94.8 | 88.3 / 89.7 | 86.8 / 87.6 | 78.7 / 81.3 | 28.7 |
+| liblouis (strict) | 100 / 98.88 | | 62.3 / 63.8 | 64.8 / 64.5 | 63.0 / 59.2 | 21.0 |
+
+- More steps alone change nothing (ctrl matches Stage A), so every effect below comes from the change, not extra training.
+- Non-word data takes random strings from 26 to 98 to 99% and typos from 52 to 88% (isolated). Typos that snap back to the original word fall from 25% to 9%. The unseen-word failure was a data problem.
+- Word-local reading makes isolated and in-sentence accuracy equal, as designed. As a fine-tune it costs isolated accuracy (typos 88 to 70, real held-out 98 to 92); a from-scratch run tests whether that cost is from adapting a context-trained model.
+- local + nonw + mix gives the best unseen-word accuracy on clean test text (77 and 95 vs 64 and 84 for Stage A).
+- The cost of faithfulness is noise robustness: at 10% flips the faithful runs lose 3 to 4 points, and on real photos 4 to 5 points against mix alone (33.3 vs 28.7; n=732, so a modest gap). This is the expected trade: a faithful reader no longer snaps noisy cells to a word, so that correction must come from the LLM through the soft output. The photo comparison that matters is after the LLM.
+- The braille-side noise model is worth having: mix raises 10% OCR-noise accuracy by 6 to 7 points and real-photo accuracy from 25.5 to 33.3, the largest real-photo gain so far (liblouis 21.0).
+
+Decision: run local + nonw + mix from scratch (20,000 steps, Stage A settings; `exp/vocab/v2/g1_scratch_local_nonw_mix`, job 513670, eval 513671). Word-local and non-word data are both required by the design (no sentence context; copy any string). GPU time for this step: 4.1 h training, 1.0 h evaluation.
