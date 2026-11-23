@@ -208,3 +208,33 @@ Print with the same template scores 74.0 (G1) and 73.8 (G2). BPE restates short 
 By word type (G1 T3, 6,061 options): misread rate 44% for words unseen in training, 14% for 1 to 9 occurrences, 2 to 4% above 100; 4% for one-print-token words, 14% for two, 21% for three, 45% for four or more. Braille units per word matter little (3 to 7%). Grade 1 rule units are close to cells (no contractions), so segmentation cannot be what reduces misreads there.
 
 Conclusion: misreads come from the frozen model composing new vectors for words it rarely saw, not from segmentation. Design options under discussion: an encoder that reads each braille word into a distribution over the print vocabulary (recommended), rare-word training data, or print-isomorphic units.
+
+## Scope decisions and real-image route (2026-11-22)
+
+Decisions (Stella):
+- Study only the tokenizer. No rule-shift tests (other braille codes or table versions).
+- Stop trying to match liblouis on clean braille it generated itself. Our test braille is liblouis forward output, so liblouis back-translation is near 100% on it by construction. A liblouis fallback is a later patch, not part of the method.
+- The method's case rests on reading braille liblouis did not generate: real photos read by an optical recognizer.
+
+Stage A rollouts (step 10k) showed the encoder's clean failure mode: on unseen words it substitutes a more frequent word (backpay as backpack, boar as board, regulative as regulatory) and corrects source misspellings. Greedy held-out word accuracy 94% clean vs liblouis 100%; 78% vs 67 to 70% at 5% flips. The training log's teacher-forced held-out accuracy (76%) is below greedy, so that logged metric is suspect.
+
+Real-image setup:
+- Images: real-braille-images of Kartik0806/BrailleBench (commit 04a075a), 259 benchmark photos (215 Grade 1, 44 Grade 2) and 142 book photos (no grade; assigned by closer liblouis forward translation of the label, all came out Grade 1). Print labels only, 1,342 label words.
+- Detector: DotNeuralNet YOLOv8-m (snoop2head/yolov8m-braille, sha256 aeb1fe31...), trained on Angelina, DSBI and natural-scene photos. The original Angelina Reader weights URL is dead. Pickle imports checked before loading (torch and ultralytics classes only). Runs in a separate venv (venv-obr: ultralytics 8.0.58, torch 2.1.2). Lines and spaces from box geometry with fixed rules (`scripts/realimg/obr_detect.py`).
+- Scoring: `scripts/realimg/realimg_score.py`; word accuracy from a word alignment against the label, after lowercasing and stripping punctuation.
+
+Interim result (G1 Stage A ckpt step 19000, G2 final):
+
+| Cell error of detected cells vs liblouis forward of label | Images | Label words | Encoder | liblouis |
+|---|---|---|---|---|
+| under 10% | 19 | 64 | 82.8 | 76.6 |
+| 10 to 25% | 60 | 245 | 51.4 | 43.3 |
+| 25 to 50% | 122 | 502 | 23.3 | 17.9 |
+| 50% or more | 200 | 531 | 10.0 | 8.9 |
+| All | 401 | 1,342 | 26.0 | 21.8 |
+
+On the liblouis forward translation of the same labels: encoder 98.6, liblouis 100.
+
+- The detector is the bottleneck: half the images have 50% or more cell error, where neither reader recovers much.
+- Real recognition noise is not dot flips. Of the cell edits, about 1,144 are insertions (often a repeated cell, e.g. ⠁⠁⠁), 417 deletions, 1,521 unequal-length replacements, 362 multi-dot substitutions, 42 one-dot substitutions and 44 space errors. Our training noise (uniform dot flips) covers almost none of this, yet the encoder still beats liblouis in every bucket.
+- These 401 images are the test set. Any noise model must be estimated elsewhere (candidate: detector output vs gold cell labels on the Angelina dataset, which has per-cell labels).
