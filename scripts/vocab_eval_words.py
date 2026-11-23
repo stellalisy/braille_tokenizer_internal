@@ -10,6 +10,12 @@ Words are split into seen (in the training sentences or the training word list),
 non-alphabetic (numbers, symbols). Writes <run>/words/result.json and misread samples.
 
     python scripts/vocab_eval_words.py --run exp/vocab/g1_a_s0
+
+With --noise-profile writing|ocr the clean inputs are corrupted here with brltok.noise.braille_noise
+at each rate (seeded) instead of reading the dot-flip files; outputs get a _<profile> suffix. Because
+insertions and deletions can change liblouis's word count, "pipeline_strict" counts every word of a
+span as wrong when the back-translation does not split into the right number of words (the plain
+"pipeline" figure leaves such spans out, which flatters liblouis).
 """
 import argparse
 import json
@@ -40,8 +46,10 @@ def main():
     ap.add_argument("--revision", default="70d244cc86ccca08cf5af4e1e306ecf908b1ad5e")
     ap.add_argument("--rates", default="0,2,5,10")
     ap.add_argument("--hard", action="store_true")
+    ap.add_argument("--noise-profile", default=None, choices=["writing", "ocr"])
     a = ap.parse_args()
     out = f"{a.run}/words"
+    sfx = f"_{a.noise_profile}" if a.noise_profile else ""
     os.makedirs(out, exist_ok=True)
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -75,7 +83,18 @@ def main():
     results, samples = {}, defaultdict(list)
     for ds in ("commonsenseqa", "gsm8k"):
         for P in [int(x) for x in a.rates.split(",")]:
-            recs = [json.loads(l) for l in open(f"{a.inputs}/{ds}/g{g}_unicode_p{P}.jsonl", encoding="utf8")]
+            if a.noise_profile:
+                import random as _r
+                from brltok.noise import braille_noise
+                nr = _r.Random(1000 + P)
+                recs = [json.loads(l) for l in open(f"{a.inputs}/{ds}/g{g}_unicode_p0.jsonl", encoding="utf8")]
+                for r in recs:
+                    r["braille_question"] = braille_noise(normalize(r["braille_question"]), P / 100, nr, a.noise_profile)
+                    if r.get("braille_choices"):
+                        r["braille_choices"] = [braille_noise(normalize(c), P / 100, nr, a.noise_profile)
+                                                for c in r["braille_choices"]]
+            else:
+                recs = [json.loads(l) for l in open(f"{a.inputs}/{ds}/g{g}_unicode_p{P}.jsonl", encoding="utf8")]
             spans, texts = [], []
             n_spans = 0
             for r in recs:
@@ -90,6 +109,7 @@ def main():
             stats = defaultdict(lambda: [0, 0])
             conf = {"right": [], "wrong": []}
             pipe = defaultdict(lambda: [0, 0])
+            strict = defaultdict(lambda: [0, 0])
             for k in range(0, len(spans), 64):
                 dec = enc.decode(spans[k: k + 64], hard=a.hard)
                 for b, t, (vec, ids, cf, lens) in zip(spans[k: k + 64], texts[k: k + 64], dec):
@@ -107,6 +127,9 @@ def main():
                             stats[s][0] += ok
                             stats[s][1] += 1
                         conf["right" if ok else "wrong"].append(min(pc) if pc else 0.0)
+                        for s in ("all", cat(w)):
+                            strict[s][0] += back_ok and bw == w
+                            strict[s][1] += 1
                         if back_ok:
                             for s in ("all", cat(w)):
                                 pipe[s][0] += bw == w
@@ -118,18 +141,20 @@ def main():
                                                           "back": bw if back_ok else None})
             res = {s: {"acc": round(100 * v[0] / v[1], 2), "n": v[1]} for s, v in sorted(stats.items())}
             res["pipeline"] = {s: {"acc": round(100 * v[0] / v[1], 2), "n": v[1]} for s, v in sorted(pipe.items())}
+            res["pipeline_strict"] = {s: {"acc": round(100 * v[0] / v[1], 2), "n": v[1]} for s, v in sorted(strict.items())}
             res["confidence"] = {k2: round(sum(v) / max(1, len(v)), 3) for k2, v in conf.items()}
             res["spans_scored"] = f"{len(spans)}/{n_spans}"
             results[f"{ds}/p{P}"] = res
             print(f"{ds:14s} p{P:<2d} all {res['all']['acc']:6.2f}  seen {res.get('seen', {}).get('acc', '-')}  "
                   f"unseen {res.get('unseen', {}).get('acc', '-')} (n={res.get('unseen', {}).get('n', 0)})  "
                   f"nonalpha {res.get('nonalpha', {}).get('acc', '-')}  | pipeline {res['pipeline'].get('all', {}).get('acc', '-')} "
-                  f"vs enc {res['pipeline'].get('enc_on_same_words', {}).get('acc', '-')}  conf r/w {res['confidence']}", flush=True)
+                  f"vs enc {res['pipeline'].get('enc_on_same_words', {}).get('acc', '-')}  "
+                  f"pipeline strict {res['pipeline_strict']['all']['acc']}  conf r/w {res['confidence']}", flush=True)
     json.dump({"results": results, "run": a.run, "hard": a.hard, "command": "python " + " ".join(sys.argv),
                "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                "liblouis": translate.version(), "slurm_job": os.environ.get("SLURM_JOB_ID")},
-              open(f"{out}/result{'_hard' if a.hard else ''}.json", "w"), indent=1)
-    json.dump(samples, open(f"{out}/misreads.json", "w"), indent=1, ensure_ascii=False)
+              open(f"{out}/result{'_hard' if a.hard else ''}{sfx}.json", "w"), indent=1)
+    json.dump(samples, open(f"{out}/misreads{sfx}.json", "w"), indent=1, ensure_ascii=False)
 
 
 if __name__ == "__main__":
