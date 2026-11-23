@@ -251,3 +251,24 @@ Greedy word exact match on Phase A test spans (`scripts/vocab_eval_words.py`, ru
 | 2 | GSM8K | 98.25 / 98.87 | 96.95 / 92.41 | 94.93 / 83.49 | 91.50 / 70.76 | 81.1 |
 
 The real-image scores above are unchanged with the final G1 encoder (`exp/realimg/score_v1.json`): 26.0 vs 21.8 overall. Stage A GPU time: about 2 x 3.2 h.
+
+## Why unseen words still fail: the encoder recognizes words, it does not read letters (2026-11-22)
+
+The "unseen" test words (66 in CommonsenseQA, 153 in GSM8K) are mostly source misspellings and rare names. Of the 24 G1 CommonsenseQA misreads, 14 return the intended word (cloesd as close, libary as library, resteraunt as restaurant) and 10 return a different word (laddle as paddle, landshark as landmark, sexploiter as spokesperson, oik as oil). In GSM8K, names become common names (Locsin as Lopez, Kylar as Kyle).
+
+Copy probe (`scripts/analysis/vocab_copy_diag.py`, 1,000 items per set, clean liblouis braille, greedy exact copy; G1 / G2):
+
+| Probe | Isolated word | Same word inside a dev sentence |
+|---|---|---|
+| Real held-out words | 94.9 / 94.6 | 68.7 / 68.4 |
+| One-letter typos of common words | 52.3 / 51.9 | 26.9 / 29.4 |
+| Random letter strings (4 to 9) | 26.0 / 27.1 | 10.9 / 10.1 |
+
+- Copy accuracy falls with distance from the training lexicon (95, 52, 26). A letter reader would be roughly flat.
+- Sentence context costs about 25 points. In context, 23% of real held-out words and 58% of typos are replaced by a known word; 39% of typos (G1) snap back to the original word.
+- Wrong reads are not near ties: the gold spelling's log probability averages -3 to -12, against -1 to -2.6 for the output. In context, confidence no longer separates right from wrong for typos (0.45 vs 0.47).
+- Random strings also come out garbled when isolated (fzbnnknz as fubonnanz), so the decoder's spelling of arbitrary letter sequences in Qwen tokens is weak as well.
+
+Cause: Stage A training is solvable by word recognition. Every target is a real word (150k word list plus corpus sentences), so the model never needs to copy letters, and in real sentences context always agrees with the cells, so using context is a free shortcut. The design assumed subword outputs would let unseen words be composed; that holds for well-formed rare words read alone (95%) but not for non-words or in context.
+
+Tension: the same lexical and contextual prior is likely what makes the encoder robust to dot flips (90 to 93% at 10% vs liblouis 62 to 71%). A string that is not a word is either a noisy word or a real non-word; the reader can only tell by how noisy the input looks. The soft output can carry that ambiguity to the model if the reader is calibrated.
