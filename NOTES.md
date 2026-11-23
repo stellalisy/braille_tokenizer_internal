@@ -323,3 +323,32 @@ Training from scratch gives the same model as the fine-tune, so word-local readi
 - Unseen-word accuracy differs by 6 and 3 points between fine-tune and scratch on n=66 and 153 words, within noise.
 
 Next: G2 from scratch with the same settings (job 514185, eval 514186), then the acceptance tests through the LLM. GPU time: 3.3 h training, 0.2 h evaluation.
+
+## Revision 2: G2 from scratch, and the first test through the model (2026-11-23)
+
+G2 local + non-word + mix from scratch (`exp/vocab/v2/g2_scratch_local_nonw_mix`, 20,000 steps) repeats the G1 pattern. Copy probe isolated / in sentence, against Stage A G2: real held-out 93.4 / 93.3 (94.6 / 67.7), typos 76.7 / 76.6 (52.1 / 27.5), random 97.7 / 97.7 (26.8 / 7.7). Unseen test words, clean: 74.2 / 92.8 (57.6 / 81.1). 10% flips: 85.7 / 86.4 (90.4 / 91.5). Real photos G2 (610 words): 28.5 (Stage A 26.6, liblouis 22.6).
+
+Through the model: Qwen3-1.7B, thinking off, greedy, 8,192 new tokens, Phase A prompts and scoring (`scripts/phaseB_eval.py --encoder`, results in `<run>/llm_{soft,hard}`). Print and pipeline through `scripts/phaseA_eval.py` with the same token budget (`exp/v2llm/print_pipe`). Noisy inputs from `scripts/v2_build_inputs.py` (`data/v2inputs`, seed 4343): p = dot flips (Phase A files), w = writing profile, o = measured OCR profile, at the given percent. Print: CommonsenseQA 68.3, GSM8K 83.0. Full test sets (1,221 and 1,319 items).
+
+| Input | p0 | p10 | w5 | w10 | o5 | o10 |
+|---|---|---|---|---|---|---|
+| CSQA G1 pipeline | 68.1 | 36.0 | 49.0 | 38.7 | 54.5 | 40.2 |
+| CSQA G1 Stage A soft / hard | 67.0 / 66.9 | 54.4 / 52.6 | 55.5 / 55.6 | 49.1 / 48.1 | 54.4 / 50.3 | 41.6 / 40.9 |
+| CSQA G1 v2 soft / hard | 66.7 / 67.2 | 47.7 / 47.9 | 57.0 / 56.1 | 50.5 / 48.5 | 56.0 / 55.1 | 46.9 / 44.8 |
+| CSQA G2 pipeline | 68.1 | 36.8 | 49.6 | 37.4 | 52.8 | 42.3 |
+| CSQA G2 Stage A soft / hard | 66.8 / 67.2 | 52.7 / 49.9 | 57.4 / 57.9 | 49.1 / 48.1 | 54.1 / 52.6 | 43.2 / 42.1 |
+| CSQA G2 v2 soft / hard | 67.7 / 67.2 | 48.2 / 49.8 | 57.7 / 58.3 | 48.2 / 46.4 | 56.7 / 55.1 | 45.6 / 46.1 |
+| GSM8K G1 pipeline | 81.5 | 21.2 | 45.3 | 23.5 | 42.4 | 26.6 |
+| GSM8K G1 Stage A soft / hard | 80.2 / 79.3 | 55.0 / 52.6 | 58.5 / 58.2 | 44.0 / 41.2 | 47.1 / 46.7 | 30.1 / 28.5 |
+| GSM8K G1 v2 soft / hard | 81.0 / 80.1 | 49.8 / 48.8 | 61.9 / 61.1 | 45.8 / 45.8 | 51.0 / 51.9 | 35.7 / 33.1 |
+| GSM8K G2 pipeline | 80.7 | 22.9 | 44.9 | 23.5 | 47.0 | 29.0 |
+| GSM8K G2 Stage A soft / hard | 79.3 / 79.7 | 50.5 / 50.6 | 56.5 / 55.9 | 40.0 / 38.4 | 50.1 / 48.1 | 30.6 / 30.1 |
+| GSM8K G2 v2 soft / hard | 81.1 / 80.4 | 45.3 / 43.8 | 59.3 / 58.1 | 39.1 / 37.3 | 52.7 / 52.3 | 36.2 / 34.1 |
+
+- Clean: every encoder is within 2.3 points of print and within 1 point of the pipeline.
+- Braille-side noise: the v2 reader beats Stage A on the writing and OCR profiles in 14 of 16 cells, most at 10% OCR (G1 GSM8K 35.7 vs 30.1 vs pipeline 26.6). Every encoder beats the pipeline on every noisy input.
+- Dot flips: v2 loses 4 to 7 points to Stage A at 10% flips. This is the faithfulness cost plus seeing flips on only a third of noisy spans.
+- Soft against hard: soft is ahead by about 1 point on average (range -1.6 to +2.9), small against the 1,200-item test sets. The soft mix carries little the model uses beyond the top reading. By the design note's own criterion, the interface is the open problem.
+- Noise still costs far more than it should: at 10% writing noise GSM8K falls from 83 (print) to about 46. The model's context is not resolving the reader's uncertainty.
+
+GPU time: 2.0 h (nine jobs). G2 from scratch 3.1 h, its suite and the G2 Stage A suite 0.4 h.
