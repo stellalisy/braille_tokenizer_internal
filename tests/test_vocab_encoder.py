@@ -96,3 +96,27 @@ def test_local_reader_ignores_context():
     glob = VocabEncoder(torch.arange(40), emb, d=32, enc_layers=2, dec_layers=1, heads=2, max_len=64,
                         max_tokens=8, dropout=0.0, local=False).eval()
     assert not torch.allclose(glob.encode(["⠁⠃"])[0, :2], glob.encode(["⠉⠙⠑ ⠁⠃ ⠋"])[0, 4:6], atol=1e-3)
+
+
+def test_nbest_matches_greedy_and_is_sorted():
+    tok = FakeTok()
+    spans = ["⠁⠃ ⠉", "⠙⠑"]
+    ids = [w for t in ["ab c", "de"] for w in word_targets(tok, t)]
+    enc = tiny()
+    opt = torch.optim.Adam(enc.parameters(), lr=3e-3)
+    for _ in range(300):
+        loss, _ = enc.loss(spans, ids, smoothing=0.0)
+        opt.zero_grad()
+        loss.backward()
+        opt.step()
+    enc.eval()
+    nb = enc.nbest(spans, k=4)
+    assert [len(x) for x in nb] == [2, 1]
+    flat = [w for sp in nb for w in sp]
+    for gold, cands in zip(ids, flat):
+        assert 1 <= len(cands) <= 4
+        assert cands[0][0] == gold
+        lps = [c[1] for c in cands]
+        assert lps == sorted(lps, reverse=True)
+        assert sum(torch.tensor(lps).exp()) <= 1 + 1e-4
+        assert len({tuple(c[0]) for c in cands}) == len(cands)

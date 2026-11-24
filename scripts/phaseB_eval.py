@@ -41,6 +41,9 @@ def main():
     ap.add_argument("--encoder", default=None,
                     help="print-vocabulary encoder checkpoint (brltok.vocab_encoder); --run then names its run dir")
     ap.add_argument("--hard", action="store_true", help="with --encoder: argmax token embeddings instead of soft mixes")
+    ap.add_argument("--readings", default=None,
+                    help="with --encoder: directory of <ds>_<cond>.jsonl print ids per span (scripts/vocab_rescore.py), "
+                         "embedded with the base table in place of the reader's output")
     ap.add_argument("--thinking", action="store_true",
                     help="Qwen3 thinking mode; use with --max-tokens 32768 --max-model-len 36864 as in Phase A")
     ap.add_argument("--chunk", type=int, default=256)
@@ -113,7 +116,11 @@ def main():
         shown = "".join(s if isinstance(s, str) else "[" + s.braille + "]" for s in segs)
         if a.encoder:
             vx = build_vocab(segs, tok)
-            dec = enc.decode(vx.spans, hard=a.hard) if vx.spans else []
+            if "_reading" in r:
+                assert len(r["_reading"]) == len(vx.spans)
+                dec = [(base_bf[torch.tensor(ids, dtype=torch.long)],) for ids in r["_reading"]]
+            else:
+                dec = enc.decode(vx.spans, hard=a.hard) if vx.spans else []
             parts = [base_bf[torch.tensor(v)] if k == "t" else dec[v][0].to("cpu", torch.bfloat16) for k, v in vx.parts]
             return torch.cat(parts), shown
         ex = build(segs, tok, btok)
@@ -139,6 +146,10 @@ def main():
             path = f"{a.inputs}/{ds}/{g}_unicode_{p}.jsonl"
         if cond != "qadev":
             recs = [json.loads(l) for l in open(path, encoding="utf8")][: a.limit]
+        if a.readings:
+            rd = [json.loads(l)["spans"] for l in open(f"{a.readings}/{ds}_{cond}.jsonl", encoding="utf8")]
+            for r, x in zip(recs, rd):
+                r["_reading"] = x
         if cond == "qadev":
             base_choices = {i: r.get("choices") for i, r in enumerate(recs)}
         elif ds == "commonsenseqa":
@@ -180,7 +191,7 @@ def main():
 
     json.dump({"command": "python " + " ".join(sys.argv), "run": a.run, "print_embeds": a.print_embeds,
                "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-               "encoder": a.encoder, "hard": a.hard,
+               "encoder": a.encoder, "hard": a.hard, "readings": a.readings,
                "model": a.model, "revision": a.revision, "thinking": a.thinking, "seed": a.seed,
                "decoding": {"temperature": 0.0, "max_tokens": a.max_tokens}, "vllm": vllm.__version__,
                "slurm_job": os.environ.get("SLURM_JOB_ID")}, open(f"{out}/config.json", "w"), indent=1)

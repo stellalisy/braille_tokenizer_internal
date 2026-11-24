@@ -249,6 +249,46 @@ class VocabEncoder(nn.Module):
             out.append((torch.cat(v) if v else H.new_zeros((0, self.E.shape[1])), i_, c, n))
         return out
 
+    @torch.no_grad()
+    def nbest(self, spans: list[str], k: int = 8):
+        """Beam search per word (width k). Per span, per word: up to k (print ids, log prob) pairs, best
+        first. The log prob is of the whole token sequence including END, under the same softmax over
+        allowed tokens plus END that training and greedy decoding use."""
+        H = self.encode(spans)
+        mem, mpad, words = self.word_memory(H, spans)
+        W, dev, endc = len(words), H.device, len(self.allowed)
+        memk, mpadk = mem.repeat_interleave(k, 0), mpad.repeat_interleave(k, 0)
+        prev = torch.zeros((W * k, 0), dtype=torch.long, device=dev)
+        score = torch.full((W, k), float("-inf"), device=dev)
+        score[:, 0] = 0.0
+        fin = [[] for _ in range(W)]
+        for step in range(self.max_tokens):
+            lg = self.logits(memk, mpadk, prev)[:, -1].float()
+            if step == 0:
+                lg[:, endc] = float("-inf")
+            lp = F.log_softmax(lg, -1).view(W, k, -1)
+            if step > 0:
+                ends = (score + lp[:, :, endc]).cpu()
+                pv = prev.view(W, k, -1).cpu()
+                for w, b in torch.nonzero(torch.isfinite(ends)).tolist():
+                    fin[w].append((pv[w, b].tolist(), float(ends[w, b])))
+            cand = (score[:, :, None] + lp[:, :, :endc]).view(W, -1)
+            score, idx = cand.topk(k, -1)
+            beam, tok = idx // endc, idx % endc
+            # a word is done once k finished readings all beat its best open beam (scores only fall)
+            kth = torch.tensor([sorted((x[1] for x in f), reverse=True)[k - 1] if len(f) >= k else float("-inf")
+                                for f in fin], device=dev)
+            score = torch.where(score > kth[:, None], score, torch.full_like(score, float("-inf")))
+            if not torch.isfinite(score).any():
+                break
+            rows = (torch.arange(W, device=dev)[:, None] * k + beam).view(-1)
+            prev = torch.cat([prev[rows], tok.view(-1, 1)], 1)
+        res = [[] for _ in spans]
+        for w, (i, _, _) in enumerate(words):
+            best = sorted(fin[w], key=lambda x: -x[1])[:k]
+            res[i].append([(self.allowed[torch.tensor(seq, dtype=torch.long)].tolist(), lp_) for seq, lp_ in best])
+        return res
+
 
 def load_encoder(path: str, emb: torch.Tensor, device="cuda") -> VocabEncoder:
     ck = torch.load(path, map_location="cpu", weights_only=False)

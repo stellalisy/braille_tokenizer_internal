@@ -352,3 +352,39 @@ Through the model: Qwen3-1.7B, thinking off, greedy, 8,192 new tokens, Phase A p
 - Noise still costs far more than it should: at 10% writing noise GSM8K falls from 83 (print) to about 46. The model's context is not resolving the reader's uncertainty.
 
 GPU time: 2.0 h (nine jobs). G2 from scratch 3.1 h, its suite and the G2 Stage A suite 0.4 h.
+
+## Revision 2: n-best rescoring reference (2026-11-24)
+
+The reader's candidate lists hold the information the soft mix loses. Letting the frozen model choose among them gains 6 to 11 points under noise over the soft mix, and costs about 1 point on clean input.
+
+Method (`scripts/vocab_rescore.py`, `VocabEncoder.nbest`): beam search gives the reader's 8 best spellings per word. For each word, the model scores every candidate by the log probability of the item's whole text (question and choices, other words at the reader's top reading); the pick maximizes model log prob + lam * reader log prob. Words are rescored independently. The chosen print tokens go to the model as ordinary token embeddings (`scripts/phaseB_eval.py --readings`).
+
+Tuning on dev (400 sentences from data/phaseB/dev.jsonl, 8,100 words, 10% noise; lam in {0, 0.5, 1, 2, 4}, rescoring words with top probability below tau in {0.5, 0.9, 0.99}). Best for both grades: lam 2, tau 0.99 (every word). Word accuracy, G1 (G2):
+
+| Noise | Reader top reading | Rescored | Correct spelling in top 8 |
+|---|---|---|---|
+| flips | 88.6 (85.0) | 94.8 (92.7) | 96.7 (95.9) |
+| writing | 87.2 (85.3) | 94.3 (92.5) | 96.6 (95.6) |
+| ocr | 79.8 (80.5) | 89.3 (88.6) | 93.1 (92.9) |
+
+lam 0 (model only) is worse than no rescoring when every word is rescored (78 vs 89 on flips): the model alone prefers fluent wrong words.
+
+Through the model, v2 reader (`exp/vocab/v2/g{1,2}_scratch_local_nonw_mix/llm_rescore`), against the same reader's soft mix and Stage A's soft mix (CommonsenseQA / GSM8K; print 68.3 / 83.0):
+
+| Grade | Input | Stage A soft | v2 soft | v2 rescored | Pipeline |
+|---|---|---|---|---|---|
+| 1 | clean | 67.0 / 80.2 | 66.7 / 81.0 | 67.4 / 79.9 | 68.1 / 81.5 |
+| 1 | 10% flips | 54.4 / 55.0 | 47.7 / 49.8 | 57.7 / 56.0 | 36.0 / 21.2 |
+| 1 | 10% writing | 49.1 / 44.0 | 50.5 / 45.8 | 57.7 / 52.9 | 38.7 / 23.5 |
+| 1 | 10% OCR | 41.6 / 30.1 | 46.9 / 35.7 | 52.4 / 42.5 | 40.2 / 26.6 |
+| 2 | clean | 66.8 / 79.3 | 67.7 / 81.1 | 67.3 / 80.4 | 68.1 / 80.7 |
+| 2 | 10% flips | 52.7 / 50.5 | 48.2 / 45.3 | 56.4 / 53.6 | 36.8 / 22.9 |
+| 2 | 10% writing | 49.1 / 40.0 | 48.2 / 39.1 | 56.0 / 50.6 | 37.4 / 23.5 |
+| 2 | 10% OCR | 43.2 / 30.6 | 45.6 / 36.2 | 52.4 / 43.6 | 42.3 / 29.0 |
+
+- Rescoring beats the v2 soft mix by 5 to 11 points on every noisy input, and beats Stage A's soft mix everywhere, including dot flips, where the faithful reader alone had lost 4 to 7 points.
+- Clean cost: -1.1 to +0.7. Rescoring changes 0.4 to 1% of clean words.
+- The gap to print stays large (GSM8K 10% OCR: 43 vs 83). Part of it is words outside the top 8 (7% under OCR noise), part is independent per-word choice, and part is how the model handles residual errors.
+- This settles the design note's interface question: a faithful reader's uncertainty is useful to the model, but a single soft vector per token does not pass it on. Next design question: an interface that gives the model several readings without k passes per word.
+
+GPU time: 2.4 h (dev tuning, rescoring and evaluation, including runs lost to out-of-memory errors). Rescoring jobs report FAILED in sacct because vLLM aborts at exit after writing every output; the output files are complete.
