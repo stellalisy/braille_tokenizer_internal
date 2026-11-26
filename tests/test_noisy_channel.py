@@ -97,3 +97,28 @@ def test_unrescored_words_keep_top_reading():
     items = [[[Word("x", [Cand("a", -0.01), Cand("b", -5.0)], rescore=False)]]][0]
     picks, _ = decode([items], Weights(r=0.0, llm=1.0), llm_scorer=lambda ts: [float(t == "b") for t in ts])
     assert picks == [[[0]]]
+
+
+def test_pipeline_build_with_tiny_models():
+    from brltok.nc_pipeline import Pipeline, use_channel
+    torch.manual_seed(0)
+    chars = list("abcdehlot")
+    reader = WordSeq2Seq(66, len(chars), d=32, enc_layers=1, dec_layers=1, heads=2, max_out=5, cell_bits=True).eval()
+    trans = WordSeq2Seq(len(chars) + 1, 64, d=32, enc_layers=1, dec_layers=1, heads=2, max_out=5).eval()
+    wprior = WordSeq2Seq(1, len(chars), d=32, enc_layers=1, dec_layers=1, heads=2, max_out=5).eval()
+    lm = CellLM(d=32, layers=1, heads=2, max_len=64).eval()
+    meta = {"chars": chars, "grade": 1}
+    pipe = Pipeline("", device="cpu", k=4, n_brailings=2, tau=0.99,
+                    models=((reader, meta), (trans, meta), (wprior, meta), lm))
+    items = pipe.build([["⠓⠑ ⠇⠕", "⠁"], ["⠃"]], {"mix": Channel("mix", 0.1)})
+    assert [len(sp) for sp in items[0]] == [2, 1] and len(items[1][0]) == 1
+    for it in items:
+        for sp in it:
+            for w in sp:
+                assert 1 <= len(w.cands) <= 4
+                assert len({c.y for c in w.cands}) == len(w.cands)
+                assert all("mix" in c.chains for c in w.cands)
+    use_channel(items, "mix")
+    c = items[0][0][0].cands[0]
+    assert c.chain == c.chains["mix"][0] and c.c == c.chains["mix"][1]
+    assert all(v < 0 for v in pipe.braille_score(["⠓⠑ ⠇⠕"]))

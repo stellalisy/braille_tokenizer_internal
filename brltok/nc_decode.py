@@ -27,6 +27,7 @@ class Cand:
     wordprior: float = 0.0
     chain: float = -math.inf
     c: str = ""                 # best intended braille of y under the chain
+    chains: dict = field(default_factory=dict)   # channel key -> (chain score, intended braille)
 
 
 @dataclass
