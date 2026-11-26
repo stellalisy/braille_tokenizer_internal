@@ -60,8 +60,10 @@ def main():
     for ds in a.datasets.split(","):
         os.makedirs(f"{a.out}/{ds}", exist_ok=True)
         src = os.path.abspath(f"{a.inputs}/{ds}/print.jsonl")
-        if not os.path.exists(f"{a.out}/{ds}/print.jsonl"):
+        try:
             os.symlink(src, f"{a.out}/{ds}/print.jsonl")
+        except FileExistsError:
+            pass
         for cond in a.conds.split(","):
             recs = [json.loads(l) for l in open(f"{a.inputs}/{ds}/g{g}_unicode_{cond}.jsonl", encoding="utf8")]
             items = [[normalize(r["braille_question"])] + [normalize(c) for c in r.get("braille_choices", [])]
@@ -92,7 +94,7 @@ def main():
                "stats": stats, "command": "python " + " ".join(sys.argv),
                "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
                "slurm_job": os.environ.get("SLURM_JOB_ID"), "seconds": round(time.time() - t0)},
-              open(f"{a.out}/decode_meta.json", "w"), indent=1)
+              open(f"{a.out}/decode_meta_{a.conds.replace(',', '_')}.json", "w"), indent=1)
 
 
 if __name__ == "__main__":
