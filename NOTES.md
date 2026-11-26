@@ -388,3 +388,59 @@ Through the model, v2 reader (`exp/vocab/v2/g{1,2}_scratch_local_nonw_mix/llm_re
 - This settles the design note's interface question: a faithful reader's uncertainty is useful to the model, but a single soft vector per token does not pass it on. Next design question: an interface that gives the model several readings without k passes per word.
 
 GPU time: 2.4 h (dev tuning, rescoring and evaluation, including runs lost to out-of-memory errors). Rescoring jobs report FAILED in sacct because vLLM aborts at exit after writing every output; the output files are complete.
+
+## Revision 3: noisy-channel reader with a braille prior, Grade 1 (2026-11-26)
+
+Design: `docs/design_noisy_channel.md`. The reader now emits print characters, not Qwen tokens, so any LLM can consume its output. Each candidate reading is scored by a likelihood (the reader's own score and/or an explicit chain: a char-to-cell translation model times a braille error channel) plus two priors: a braille prior (a cell language model over the intended braille sentence) and a print prior (any LLM's log probability of the whole text). Code: `brltok/{channel,seq2seq,cell_lm,nc_decode,nc_pipeline}.py`, `scripts/nc_*.py`; models in `exp/nc/g1/`.
+
+Models (one H200 each, seed 0):
+- Character reader: word-local, 4+2 layers, d 512, same data stream, non-word share and noise mix as revision 2's `g1_scratch_local_nonw_mix`, 20k steps (45 min).
+- Translation model P(c | y): 99.8% of dev words, 100% of held-out words brailled exactly as liblouis does (16 min).
+- Braille prior: 6-layer cell LM, 1.71 bits per cell on dev (7 min).
+- Word prior P_words(y), to divide the reader's built-in print prior out (15 min).
+
+**E0, character reader against the revision 2 token reader (go).** Beam 16, same items (`exp/nc/g1/reader/eval/e0.json`):
+
+| Test | Char top 1 | Token top 1 | Char right in top 16 | Token right in top 16 |
+|---|---|---|---|---|
+| Copy typos | 85.6 | 69.0 | 100.0 | 98.9 |
+| Copy random strings | 98.7 | 98.8 | 100.0 | 100.0 |
+| Test words, clean | 99.9 | 99.8 | 100.0 | 100.0 |
+| 10% flips | 87.3 | 89.6 | 98.7 | 98.4 |
+| 10% writing | 85.7 | 88.3 | 98.0 | 97.9 |
+| 10% OCR | 77.6 | 81.4 | 94.8 | 95.6 |
+
+The character reader copies typos far more faithfully and its candidate lists are as good, but its top reading under noise is 2 to 4 points worse. The decoder below only needs the list.
+
+**E1 to E3 on dev.** 400 dev sentences, 10% noise per profile, 8,100 words; weights tuned on sentences 0 to 199, reported on 200 to 399 (4,159 words). Every word is rescored (no reading reaches probability 0.99 under label smoothing). Mean word accuracy over flip / writing / OCR, per-word rescoring, print prior Qwen3-1.7B (Llama 3.1 8B):
+
+| Likelihood | No prior | Braille prior | Print prior | Both |
+|---|---|---|---|---|
+| Reader | 81.9 | 91.0 | 92.7 (94.3) | 93.7 (94.4) |
+| Reader with word prior divided out | 78.3 | 91.5 | 92.8 (94.4) | 94.0 (94.9) |
+| Chain (translation x channel) | 63.9 | 91.2 | 92.1 (94.5) | 94.3 (95.1) |
+| Chain + reader | 77.8 | 92.0 | 93.2 (94.7) | 94.4 (95.1) |
+| Chain, channel matched to the profile (upper bound) | 64.4 | 91.7 | 92.7 (94.7) | 94.6 (95.2) |
+
+The right spelling is in the top 16 for 98.4 / 97.4 / 93.0% of report words, so the ceiling is about 96.3.
+
+- **The braille prior alone recovers most of what an LLM does.** It lifts word accuracy from 81.9 to 92.0, against 93.2 for Qwen3-1.7B, with a 7-minute cell model that has never seen print.
+- **The two priors are complementary with the small LLM.** Both together beat the better single prior by 1.2 points with Qwen3-1.7B and 0.4 with Llama 3.1 8B: the braille prior's contribution shrinks as the print prior gets stronger.
+- **The explicit chain is useless alone and best with priors.** Alone it scores 64 (it has no notion of which words exist), but with both priors it matches or beats the reader's own score. Dividing out the word prior hurts alone and helps slightly with priors. As expected for a hybrid model: the likelihood should not carry a prior once real priors are present.
+- **Knowing the true noise process barely matters.** The profile-matched channel beats the generic mix channel by 0.1 to 0.5 points.
+
+E3, joint decoding against per-word rescoring (best setting of each prior, report split, flip / writing / OCR):
+
+| Prior | Per-word | Joint (4 rounds) |
+|---|---|---|
+| Braille (Qwen run) | 95.6 / 94.1 / 86.5 | 95.6 / 94.2 / 87.4 |
+| Qwen3-1.7B | 96.6 / 95.2 / 87.7 | 97.4 / 96.0 / 89.7 |
+| Both, Qwen3-1.7B | 97.3 / 95.9 / 89.9 | 97.6 / 96.3 / 90.7 |
+| Llama 3.1 8B | 97.5 / 96.3 / 90.4 | 97.8 / 96.7 / 91.4 |
+| Both, Llama 3.1 8B | 97.6 / 96.6 / 91.1 | 98.0 / 96.8 / 91.8 |
+
+Joint decoding adds 0.2 to 2.0 points, most under OCR noise, where neighbouring words are more often wrong together. It does not converge within 4 rounds on some sentences.
+
+Against revision 2's token rescoring (94.8 / 94.3 / 89.3, measured on all 400 sentences rather than the report half): the best revision 3 setting with Qwen3-1.7B gives 97.6 / 96.3 / 90.7, from a weaker top reading.
+
+GPU time: 2.7 h (four trainings 1.4 h, smoke run 0.1 h, E0 0.5 h, dev with two LLMs 0.7 h).
